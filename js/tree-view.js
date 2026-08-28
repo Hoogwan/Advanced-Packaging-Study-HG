@@ -1,13 +1,14 @@
-// Structure Map — a collapsible knowledge tree of the whole Advanced
-// Packaging field, with a detail panel and jump-to-3D links.
+// Structure Map — a hub-and-spoke, drill-down mind-map / org-chart of the
+// whole Advanced Packaging field, with jump-to-3D links.
 (function () {
   'use strict';
 
   const TREE = window.STRUCTURE_TREE;
   const PACKAGES = window.PACKAGES || [];
 
-  let selectedNode = null;
-  let expanded = new Set(); // node ids currently expanded
+  // path: array of nodes from root to the current "hub" (last item = hub)
+  let path = TREE ? [TREE] : [];
+  let selectedLeafId = null; // a leaf child currently shown expanded inline
 
   function pkgName(id) {
     const p = PACKAGES.find(p => p.id === id);
@@ -20,105 +21,133 @@
     return el ? el.name : elementId;
   }
 
+  function currentColor() {
+    for (let i = path.length - 1; i >= 0; i--) {
+      if (path[i].color) return path[i].color;
+    }
+    return '#7a2e1f';
+  }
+
   function render() {
     const root = document.getElementById('structure-root');
     if (!root || !TREE) return;
 
-    // Expand the 5 top-level branches by default so the shape of the tree is
-    // visible immediately; deeper levels start collapsed.
-    (TREE.children || []).forEach(c => expanded.add(c.id));
-
     root.innerHTML = `
       <header class="sv-header">
-        <div class="sv-eyebrow">Structure Map</div>
-        <h1 class="sv-title">Advanced Packaging — the whole field as one tree</h1>
-        <p class="sv-lede">Click any branch to expand it, and any node to see its explanation. Nodes with a
-          <span class="sv-link-hint">↗ 3D</span> tag link straight into the matching structure in the 3D Explorer.</p>
+        <div class="sv-header-icon"><i class="fa-solid fa-diagram-project"></i></div>
+        <h1 class="sv-title">The field, as one map</h1>
       </header>
+      <div class="sv-crumbs" id="sv-crumbs"></div>
+      <div class="sv-map" id="sv-map"></div>
+    `;
 
-      <div class="sv-body">
-        <div class="sv-tree-col">
-          <div class="sv-tree-actions">
-            <button class="sv-mini-btn" id="sv-expand-all">Expand all</button>
-            <button class="sv-mini-btn" id="sv-collapse-all">Collapse all</button>
-          </div>
-          <div class="sv-tree" id="sv-tree"></div>
+    renderCrumbs();
+    renderMap();
+  }
+
+  function renderCrumbs() {
+    const crumbs = document.getElementById('sv-crumbs');
+    if (!crumbs) return;
+    crumbs.innerHTML = path.map((n, i) => `
+      <button class="sv-crumb ${i === path.length - 1 ? 'active' : ''}" data-idx="${i}">
+        ${n.icon ? `<i class="fa-solid ${n.icon}"></i>` : ''}${escapeHtml(n.title)}
+      </button>
+      ${i < path.length - 1 ? '<i class="fa-solid fa-chevron-right sv-crumb-sep"></i>' : ''}
+    `).join('');
+
+    crumbs.querySelectorAll('.sv-crumb').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.idx, 10);
+        path = path.slice(0, idx + 1);
+        selectedLeafId = null;
+        renderCrumbs();
+        renderMap();
+      });
+    });
+  }
+
+  function renderMap() {
+    const map = document.getElementById('sv-map');
+    if (!map) return;
+    const hub = path[path.length - 1];
+    const color = currentColor();
+    const children = hub.children || [];
+
+    map.style.setProperty('--hub-color', color);
+
+    let html = `
+      <div class="sv-hub-row">
+        <div class="sv-hub-card" style="--hub-color:${color}">
+          <div class="sv-hub-icon"><i class="fa-solid ${hub.icon || 'fa-circle'}"></i></div>
+          <div class="sv-hub-title">${escapeHtml(hub.title)}</div>
+          ${hub.desc ? `<div class="sv-hub-desc">${escapeHtml(hub.desc)}</div>` : ''}
+          ${hub.link ? `<button class="sv-hub-jump" data-pkg="${hub.link.packageId}" data-el="${hub.link.elementId || ''}"><i class="fa-solid fa-cube"></i> View in 3D</button>` : ''}
         </div>
-        <aside class="sv-detail-col" id="sv-detail"></aside>
       </div>
     `;
 
-    document.getElementById('sv-expand-all').addEventListener('click', () => {
-      collectAllIds(TREE).forEach(id => expanded.add(id));
-      renderTree();
-    });
-    document.getElementById('sv-collapse-all').addEventListener('click', () => {
-      expanded.clear();
-      renderTree();
-    });
-
-    renderTree();
-    renderDetail(TREE); // show root description initially
-  }
-
-  function collectAllIds(node) {
-    let ids = [];
-    if (node.children) {
-      node.children.forEach(c => {
-        ids.push(c.id);
-        ids = ids.concat(collectAllIds(c));
-      });
-    }
-    return ids;
-  }
-
-  function renderTree() {
-    const container = document.getElementById('sv-tree');
-    if (!container) return;
-    container.innerHTML = buildNodeHtml(TREE, 0, true);
-    bindTreeEvents(container);
-  }
-
-  function buildNodeHtml(node, depth, isRoot) {
-    const hasChildren = node.children && node.children.length > 0;
-    const isExpanded = expanded.has(node.id) || isRoot;
-    const isSelected = selectedNode === node;
-    const hasLink = !!node.link;
-
-    let html = `
-      <div class="sv-node" style="--depth:${depth}">
-        <div class="sv-node-row ${isSelected ? 'selected' : ''} ${isRoot ? 'sv-node-root' : ''}" data-id="${node.id}">
-          ${hasChildren ? `<button class="sv-toggle ${isExpanded ? 'open' : ''}" data-toggle="${node.id}">${isExpanded ? '−' : '+'}</button>` : '<span class="sv-toggle-spacer"></span>'}
-          <span class="sv-node-title">${escapeHtml(node.title)}</span>
-          ${hasLink ? '<span class="sv-node-3d-badge">↗ 3D</span>' : ''}
+    if (children.length) {
+      html += `
+        <div class="sv-connector"></div>
+        <div class="sv-children-grid" style="--n:${Math.min(children.length, 4)}">
+          ${children.map(c => renderChildCard(c, color)).join('')}
         </div>
-    `;
-    if (hasChildren && isExpanded) {
-      html += `<div class="sv-children">${node.children.map(c => buildNodeHtml(c, depth + 1, false)).join('')}</div>`;
+      `;
+    } else if (!hub.link) {
+      html += `<div class="sv-empty-note"><i class="fa-solid fa-circle-info"></i> End of this branch</div>`;
     }
-    html += `</div>`;
-    return html;
-  }
 
-  function bindTreeEvents(container) {
-    container.querySelectorAll('.sv-toggle').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const id = btn.dataset.toggle;
-        if (expanded.has(id)) expanded.delete(id); else expanded.add(id);
-        renderTree();
-      });
-    });
-    container.querySelectorAll('.sv-node-row').forEach(row => {
-      row.addEventListener('click', () => {
-        const node = findNode(TREE, row.dataset.id);
-        if (node) {
-          selectedNode = node;
-          renderTree();
-          renderDetail(node);
+    map.innerHTML = html;
+
+    map.querySelectorAll('.sv-child-card').forEach(card => {
+      card.addEventListener('click', (e) => {
+        if (e.target.closest('.sv-child-jump')) return;
+        const node = findNode(TREE, card.dataset.id);
+        if (!node) return;
+        if (node.children && node.children.length) {
+          path.push(node);
+          selectedLeafId = null;
+          renderCrumbs();
+          renderMap();
+        } else {
+          selectedLeafId = selectedLeafId === node.id ? null : node.id;
+          renderMap();
         }
       });
     });
+    map.querySelectorAll('.sv-child-jump, .sv-hub-jump').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const pkg = btn.dataset.pkg;
+        const el = btn.dataset.el;
+        if (window.AppNav && pkg) window.AppNav.goToPackage(pkg, el || undefined);
+      });
+    });
+  }
+
+  function renderChildCard(node, parentColor) {
+    const hasChildren = node.children && node.children.length > 0;
+    const hasLink = !!node.link;
+    const isOpen = selectedLeafId === node.id;
+    const color = node.color || parentColor;
+    return `
+      <div class="sv-child-card ${isOpen ? 'open' : ''} ${hasChildren ? 'has-children' : ''}" data-id="${node.id}" style="--card-color:${color}">
+        <div class="sv-child-icon"><i class="fa-solid ${node.icon || 'fa-circle'}"></i></div>
+        <div class="sv-child-title">${escapeHtml(node.title)}</div>
+        ${hasChildren ? `<div class="sv-child-count">${node.children.length}</div>` : ''}
+        ${hasLink && !hasChildren ? '<div class="sv-child-3d-badge"><i class="fa-solid fa-cube"></i></div>' : ''}
+        ${isOpen && !hasChildren ? `
+          <div class="sv-child-detail">
+            ${node.desc ? `<p>${escapeHtml(node.desc)}</p>` : ''}
+            ${hasLink ? `
+              <button class="sv-child-jump" data-pkg="${node.link.packageId}" data-el="${node.link.elementId || ''}">
+                <i class="fa-solid fa-cube"></i> ${escapeHtml(pkgName(node.link.packageId))}${node.link.elementId ? ' · ' + escapeHtml(elName(node.link.packageId, node.link.elementId)) : ''}
+              </button>
+            ` : ''}
+          </div>
+        ` : ''}
+      </div>
+    `;
   }
 
   function findNode(node, id) {
@@ -126,63 +155,6 @@
     if (node.children) {
       for (const c of node.children) {
         const found = findNode(c, id);
-        if (found) return found;
-      }
-    }
-    return null;
-  }
-
-  function renderDetail(node) {
-    const detail = document.getElementById('sv-detail');
-    if (!detail) return;
-
-    const crumbs = findPath(TREE, node.id) || [TREE];
-
-    detail.innerHTML = `
-      <div class="sv-crumbs">${crumbs.map(n => escapeHtml(n.title)).join(' / ')}</div>
-      <h2 class="sv-detail-title">${escapeHtml(node.title)}</h2>
-      ${node.desc ? `<p class="sv-detail-desc">${escapeHtml(node.desc)}</p>` : '<p class="sv-detail-desc sv-detail-desc-empty">A category node — expand it to see the items inside.</p>'}
-      ${node.link ? `
-        <button class="sv-jump-btn" id="sv-jump-btn">
-          Open in 3D Explorer: ${escapeHtml(pkgName(node.link.packageId))}${node.link.elementId ? ' → ' + escapeHtml(elName(node.link.packageId, node.link.elementId)) : ''} ↗
-        </button>
-      ` : ''}
-      ${node.children && node.children.length ? `
-        <div class="sv-detail-children-title">Contains</div>
-        <ul class="sv-detail-children">
-          ${node.children.map(c => `<li data-id="${c.id}">${escapeHtml(c.title)}</li>`).join('')}
-        </ul>
-      ` : ''}
-    `;
-
-    const jumpBtn = document.getElementById('sv-jump-btn');
-    if (jumpBtn) {
-      jumpBtn.addEventListener('click', () => {
-        if (window.AppNav && node.link) {
-          window.AppNav.goToPackage(node.link.packageId, node.link.elementId);
-        }
-      });
-    }
-    detail.querySelectorAll('.sv-detail-children li').forEach(li => {
-      li.addEventListener('click', () => {
-        const child = findNode(TREE, li.dataset.id);
-        if (child) {
-          selectedNode = child;
-          expanded.add(node.id);
-          renderTree();
-          renderDetail(child);
-        }
-      });
-    });
-  }
-
-  function findPath(node, targetId, path) {
-    path = path || [];
-    const nextPath = path.concat([node]);
-    if (node.id === targetId) return nextPath;
-    if (node.children) {
-      for (const c of node.children) {
-        const found = findPath(c, targetId, nextPath);
         if (found) return found;
       }
     }

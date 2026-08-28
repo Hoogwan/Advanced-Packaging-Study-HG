@@ -1,245 +1,107 @@
-// Application × Packaging Technology data
-// Source: Mahajan et al., "Applications driving advanced packaging",
-// Nature Reviews Electrical Engineering 3, 254–263 (2026), pp.255–262.
-// Structure: for each application domain — system demand, packaging response,
-// physical bottleneck, and roadmap/research target (matches the paper's framing),
-// plus a link to the closest matching structures in the 3D Explorer.
+// Application × Packaging Technology — condensed for a visual dashboard.
+// Every string here is short by design (chip/label length, not sentences).
 
 window.APPLICATIONS = [
   {
     id: 'ai-hpc',
     name: 'AI / HPC',
+    icon: 'fa-microchip',
     color: '#1F4E79',
-    tagline: 'Compute and memory demand → packaging response',
+    tagline: 'Compute & memory, fused into one package',
     diagram: {
-      caption: 'Off-package memory (cm-scale wiring) vs. co-packaged memory (sub-mm wiring)',
-      before: {
-        label: 'Off-package memory',
-        note: 'cm-scale wiring → high latency and energy',
-        stack: ['PCB', 'Package substrate', 'GPU / CPU', '← cm-scale traces →', 'DRAM (off-package)']
-      },
-      after: {
-        label: 'Co-packaged memory (HI)',
-        note: 'sub-mm wiring → lower latency and energy',
-        stack: ['Package substrate', 'Silicon interposer / bridge', 'GPU / CPU', 'HBM stack (TSV)']
-      }
+      from: { label: 'Off-package memory', chips: ['GPU / CPU', 'cm-scale traces', 'DRAM'] },
+      to:   { label: 'Co-packaged memory', chips: ['GPU / CPU', 'Si interposer', 'HBM stack'] }
     },
     quadrants: {
-      demand: [
-        'Compute demand doubling roughly every 3 months (2026)',
-        'Memory capacity and bandwidth dominate system power',
-        'Package power heading toward multi-kilowatt'
-      ],
-      response: [
-        'GPU / CPU and HBM integrated in a single package',
-        'Planar + vertical integration with very short links',
-        'Voltage regulation moved inside the package'
-      ],
-      bottleneck: [
-        'Memory wall — DRAM cell density has plateaued near 10 nm',
-        'Power density and intra-stack thermal resistance',
-        'PDN loss on the board; fine-pitch electromigration risk'
-      ],
-      roadmap: [
-        'Pitch, bandwidth, and energy-per-bit scaling targets',
-        '48 V → 1 V in-package conversion at ~90% efficiency',
-        'Liquid / two-phase cooling with thermal co-design'
-      ]
+      demand:     ['Compute demand ×2 / 3mo', 'Memory-bound power budget', 'Multi-kW packages'],
+      response:   ['GPU + HBM, one package', 'Ultra-short vertical links', 'VRM moved in-package'],
+      bottleneck: ['Memory wall (~10nm)', 'Stack thermal resistance', 'Fine-pitch EM risk'],
+      roadmap:    ['Higher bandwidth / bit', '48V→1V in-package, 90%η', 'Two-phase liquid cooling']
     },
-    recommendedPackages: ['cowos', 'hybrid', 'hbm'],
-    source: 'Mahajan et al. (2026), pp.256, 258–260 — AI energy, interconnect, power, and thermal sections.'
+    recommendedPackages: ['cowos', 'hybrid', 'hbm']
   },
   {
     id: 'smartphone',
     name: 'Smartphone',
+    icon: 'fa-mobile-screen-button',
     color: '#2E6B33',
-    tagline: 'Volume constraint → packaging response',
+    tagline: 'More function, same 8mm of space',
     diagram: {
-      caption: 'Each generation adds new blocks into the same electronics envelope — while total thickness must not grow',
-      before: {
-        label: 'Electronics envelope (< 1 mm)',
-        note: 'Display · Battery · PCB share the same footprint',
-        stack: ['Display', 'Processor die', 'RDL', 'Stacked memory (PoP) in epoxy mold', 'PCB', 'Battery']
-      },
-      after: {
-        label: 'Added every upgrade cycle',
-        note: 'while thickness stays constant or shrinks',
-        stack: ['5G antennas × 5', 'Multiple modems', 'Power delivery', 'Cameras, sensors']
-      }
+      from: { label: 'This generation', chips: ['Processor', 'RDL', 'PoP memory'] },
+      to:   { label: 'Next generation', chips: ['5× antennas', 'Multi-modem', 'Same thickness'] }
     },
     quadrants: {
-      demand: [
-        'New functions added every upgrade cycle',
-        'Larger battery for longer time between charges',
-        'Constant or thinner overall form factor'
-      ],
-      response: [
-        'Processor + RDL + stacked memory compressed under 1 mm',
-        'Compact System-in-Package (SiP) with epoxy molding',
-        'Up to five antennas and multiple modems for 5G'
-      ],
-      bottleneck: [
-        'Severe volumetric envelope for all electronics',
-        'Complex low-power power-delivery network (PDN) with switching transients',
-        'Local thermal density inside a sealed body'
-      ],
-      roadmap: [
-        'Higher integration density and further miniaturization',
-        'Compact power conditioning with low quiescent power',
-        'Cost and manufacturability at very high volume'
-      ]
+      demand:     ['New feature / cycle', 'Bigger battery, same size', 'Flat or thinner body'],
+      response:   ['<1mm compute + memory', 'Compact SiP, epoxy mold', '5 antennas, multi-modem'],
+      bottleneck: ['Extreme volume limit', 'Low-power PDN transients', 'Sealed-body hot spots'],
+      roadmap:    ['Denser integration', 'Low quiescent power', 'High-volume manufacturability']
     },
-    recommendedPackages: ['fowlp'],
-    source: 'Mahajan et al. (2026), pp.256–257 (Smartphones), p.259 (low-power electronics).'
+    recommendedPackages: ['fowlp']
   },
   {
     id: '5g-6g',
     name: '5G / 6G',
+    icon: 'fa-tower-broadcast',
     color: '#A66B00',
-    tagline: 'mmWave and sub-THz → packaging response',
+    tagline: 'As frequency climbs, antennas go vertical',
     diagram: {
-      caption: 'Same 50 mm of board width — every array element still needs its own PA / LNA / filter behind it, so the parts must go vertical as frequency rises',
-      before: {
-        label: '3 GHz (4G / 5G low band)',
-        note: 'λ/2 = 50 mm → 2 antenna elements',
-        stack: ['Antenna element', 'Antenna element']
-      },
-      after: {
-        label: '140 GHz (6G)',
-        note: 'λ/2 = 1.07 mm → 47 antenna elements, stacked vertically',
-        stack: ['47× antenna elements (vertical stack)', 'PA / LNA / filter per element', 'RF IC']
-      }
+      from: { label: '3 GHz · 5G low-band', chips: ['λ/2 = 50mm', '2 elements'] },
+      to:   { label: '140 GHz · 6G', chips: ['λ/2 = 1.07mm', '47 elements, stacked'] }
     },
     quadrants: {
-      demand: [
-        'mmWave and sub-THz spectrum (100–300 GHz for 6G)',
-        'Beamforming with dense phased arrays',
-        'Front-end must support more than 20 bands'
-      ],
-      response: [
-        'Antenna-in-package up to 60 GHz, on-chip above that',
-        'RF IC + filters + PA / LNA co-integration',
-        'Vertical element stacking at 140 GHz (λ/2 = 1.07 mm)'
-      ],
-      bottleneck: [
-        'High propagation and insertion loss at mmWave/sub-THz',
-        'Element spacing must be below half-wavelength',
-        'Coupled electrical–thermal–mechanical behavior'
-      ],
-      roadmap: [
-        'Low-insertion-loss multilayer substrates',
-        'Finer feature size and tighter alignment accuracy',
-        'Circuit–package–module multiphysics co-design'
-      ]
+      demand:     ['mmWave → sub-THz', 'Dense phased arrays', '20+ band front-end'],
+      response:   ['Antenna-in-package to 60GHz', 'RF + filter co-integration', 'Vertical element stacking'],
+      bottleneck: ['High insertion loss', 'Sub-half-wavelength spacing', 'Coupled multiphysics'],
+      roadmap:    ['Low-loss substrates', 'Finer alignment accuracy', 'Module-level co-design']
     },
-    recommendedPackages: ['fowlp'],
-    source: 'Mahajan et al. (2026), pp.257–258 — 5G/6G cellular communications devices.'
+    recommendedPackages: ['fowlp']
   },
   {
     id: 'aerospace',
     name: 'Aerospace / Harsh',
+    icon: 'fa-satellite',
     color: '#7B3F61',
-    tagline: 'SWaP and lifetime → packaging response',
+    tagline: 'Commercial tech, flight-qualified',
     diagram: {
-      caption: 'Low volume · high product mix · long lifecycle — commercial parts must be re-validated before they can fly',
-      before: {
-        label: 'Commercial HI platform',
-        note: 'Same building blocks as AI/HPC, mobile, 5G/6G',
-        stack: ['Commercial HI platform']
-      },
-      after: {
-        label: 'Deploy',
-        note: 'Customize for mission → qualify in harsh lab environment → deploy',
-        stack: ['Customize for mission', 'Qualify in harsh lab environment', 'Deploy: LEO satellite, radar, sensing']
-      }
+      from: { label: 'Commercial HI platform', chips: ['Base building blocks'] },
+      to:   { label: 'Deploy', chips: ['Customize', 'Harsh qualify', 'LEO / radar / sensing'] }
     },
     quadrants: {
-      demand: [
-        'Size, weight, and power (SWaP) constraints',
-        'Security and very high reliability',
-        'Long lifecycle, low volume, high product mix'
-      ],
-      response: [
-        'Commercial HI platform used as the base',
-        'Customized and hardened for the mission',
-        'Compact compute, RF, and sensing in one package'
-      ],
-      bottleneck: [
-        'Qualification across extreme use environments',
-        'Material and interface mismatch over long service life',
-        'Low production volume limits learning and yield data'
-      ],
-      roadmap: [
-        'Environment-specific validation procedures',
-        'Reliability test vehicles for advanced packages',
-        'Qualification and readiness roadmap for HI'
-      ]
+      demand:     ['Size · weight · power', 'High reliability, secure', 'Low volume, long life'],
+      response:   ['Commercial base platform', 'Mission-hardened variant', 'Compute + RF + sense'],
+      bottleneck: ['Harsh-environment qualification', 'Long-life material mismatch', 'Sparse yield data'],
+      roadmap:    ['Environment test protocols', 'Reliability test vehicles', 'HI readiness roadmap']
     },
-    recommendedPackages: ['chiplet', 'flipchip'],
-    source: 'Mahajan et al. (2026), p.258 — HI devices for aerospace and harsh environments.'
+    recommendedPackages: ['chiplet', 'flipchip']
   }
 ];
 
-// Application × Packaging-building-block matrix (from the summary slide).
-// level: 'essential' | 'relevant' | 'blank'
+// Building-block matrix — level: 'essential' | 'relevant' | 'blank'
 window.APP_MATRIX = {
   columns: [
-    { id: 'ai-hpc',    name: 'AI / HPC',           color: '#1F4E79' },
-    { id: 'smartphone',name: 'Smartphone',          color: '#2E6B33' },
-    { id: '5g-6g',     name: '5G / 6G',             color: '#A66B00' },
-    { id: 'aerospace', name: 'Aerospace / harsh',   color: '#7B3F61' }
+    { id: 'ai-hpc',     name: 'AI / HPC',     icon: 'fa-microchip',            color: '#1F4E79' },
+    { id: 'smartphone', name: 'Smartphone',    icon: 'fa-mobile-screen-button', color: '#2E6B33' },
+    { id: '5g-6g',      name: '5G / 6G',       icon: 'fa-tower-broadcast',      color: '#A66B00' },
+    { id: 'aerospace',  name: 'Aerospace',     icon: 'fa-satellite',           color: '#7B3F61' }
   ],
   rows: [
-    {
-      block: '2.5D interposer / Si bridge (EMIB)',
-      linkedPackages: ['cowos', 'chiplet'],
-      values: { 'ai-hpc':'essential', 'smartphone':'relevant', '5g-6g':'relevant', 'aerospace':'relevant' }
-    },
-    {
-      block: '3D die stacking + HBM (TSV)',
-      linkedPackages: ['hbm', 'hybrid'],
-      values: { 'ai-hpc':'essential', 'smartphone':'relevant', '5g-6g':'relevant', 'aerospace':'relevant' }
-    },
-    {
-      block: 'Hybrid bonding (sub-10 µm pitch)',
-      linkedPackages: ['hybrid'],
-      values: { 'ai-hpc':'essential', 'smartphone':'relevant', '5g-6g':'blank', 'aerospace':'blank' }
-    },
-    {
-      block: 'Fan-out / RDL / compact SiP',
-      linkedPackages: ['fowlp'],
-      values: { 'ai-hpc':'relevant', 'smartphone':'essential', '5g-6g':'essential', 'aerospace':'relevant' }
-    },
-    {
-      block: 'Antenna-in-package / on-chip',
-      linkedPackages: [],
-      values: { 'ai-hpc':'blank', 'smartphone':'essential', '5g-6g':'essential', 'aerospace':'relevant' }
-    },
-    {
-      block: 'In-package power delivery (GaN VRM)',
-      linkedPackages: [],
-      values: { 'ai-hpc':'essential', 'smartphone':'essential', '5g-6g':'relevant', 'aerospace':'relevant' }
-    },
-    {
-      block: 'Advanced cooling (liquid / 2-phase)',
-      linkedPackages: [],
-      values: { 'ai-hpc':'essential', 'smartphone':'relevant', '5g-6g':'relevant', 'aerospace':'relevant' }
-    }
+    { block: '2.5D interposer / bridge', linkedPackages: ['cowos', 'chiplet'], values: { 'ai-hpc':'essential', 'smartphone':'relevant', '5g-6g':'relevant', 'aerospace':'relevant' } },
+    { block: '3D stacking + HBM (TSV)',   linkedPackages: ['hbm', 'hybrid'],   values: { 'ai-hpc':'essential', 'smartphone':'relevant', '5g-6g':'relevant', 'aerospace':'relevant' } },
+    { block: 'Hybrid bonding (<10µm)',    linkedPackages: ['hybrid'],          values: { 'ai-hpc':'essential', 'smartphone':'relevant', '5g-6g':'blank',    'aerospace':'blank' } },
+    { block: 'Fan-out / RDL / SiP',       linkedPackages: ['fowlp'],           values: { 'ai-hpc':'relevant',  'smartphone':'essential','5g-6g':'essential','aerospace':'relevant' } },
+    { block: 'Antenna-in-package',        linkedPackages: [],                  values: { 'ai-hpc':'blank',     'smartphone':'essential','5g-6g':'essential','aerospace':'relevant' } },
+    { block: 'In-package power (GaN)',    linkedPackages: [],                  values: { 'ai-hpc':'essential', 'smartphone':'essential','5g-6g':'relevant', 'aerospace':'relevant' } },
+    { block: 'Advanced cooling',          linkedPackages: [],                  values: { 'ai-hpc':'essential', 'smartphone':'relevant', '5g-6g':'relevant', 'aerospace':'relevant' } }
   ],
-  legend: {
-    essential: 'Essential enabler',
-    relevant: 'Relevant / secondary',
-    blank: 'Not emphasized in the source'
-  },
-  source: 'Mahajan et al., Nature Rev. Electr. Eng. 3, 254–263 (2026), pp.255–261.'
+  legend: { essential: 'Essential', relevant: 'Relevant', blank: 'Minor' }
 };
 
-// Overarching roadmap framework (from the closing slide) — shown as an intro strip.
+// 6-step roadmap framework — kept as short stepper labels only.
 window.APP_FRAMEWORK = [
-  { step: 1, title: 'Application environment', detail: 'AI/HPC, mobile, 5G/6G, aerospace', sub: 'System-level demand' },
-  { step: 2, title: 'Target attributes', detail: 'Bandwidth, energy, pitch, power density, cost', sub: 'Quantify future targets' },
-  { step: 3, title: 'Building blocks', detail: 'Interconnect, photonics, power, thermal, reliability', sub: 'Technology response' },
-  { step: 4, title: 'Co-design', detail: 'Chip ↔ package ↔ system (electrical, thermal, mechanical, test)', sub: '' },
-  { step: 5, title: 'Models + metrology', detail: 'Multiphysics, multiscale, reduced-order, digital twin', sub: 'Predict and validate' },
-  { step: 6, title: 'Research targets', detail: 'Materials, process, equipment, design, manufacturing', sub: 'Measurable R&D goals' }
+  { step: 1, title: 'Application', icon: 'fa-bullseye' },
+  { step: 2, title: 'Target attributes', icon: 'fa-ruler' },
+  { step: 3, title: 'Building blocks', icon: 'fa-cubes' },
+  { step: 4, title: 'Co-design', icon: 'fa-diagram-project' },
+  { step: 5, title: 'Models + metrology', icon: 'fa-flask' },
+  { step: 6, title: 'Research targets', icon: 'fa-flag-checkered' }
 ];
