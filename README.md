@@ -5,20 +5,21 @@
 - **목적**: 반도체 패키징의 "큰 그림"부터 시작해, 7가지 패키징 아키텍처를 3D로 탐색하고,
   응용분야별 요구사항을 이해하고, 전체 기술 지형을 한 눈에 파악할 수 있는 인터랙티브 아틀라스
 - **주요 기능**:
-  - **00 · Overview** — 사이트 진입 시 첫 화면. "왜 패키징이 칩만큼 중요한가"를 설명하는 큰 틀 + 논문 로드맵 프레임워크(6단계) + 나머지 3개 뷰로 가는 안내 카드
+  - **00 · Overview** — 사이트 진입 시 첫 화면. 아이콘 중심의 그래픽 히어로 + 통계 칩 + 6단계 로드맵 스텝퍼(아이콘만, 텍스트 최소화) + 나머지 3개 뷰로 가는 아이콘 카드
   - **01 · 3D Explorer** — Three.js 기반 3D 뷰어 (회전/줌/단면/분해도/카메라 프리셋). 컴포넌트 클릭 시 기술 개요/키워드/재료/공정/과제/관련 기업/논문/노트 표시
-  - **02 · Applications** — AI/HPC, Smartphone, 5G/6G, Aerospace/Harsh 4개 응용분야별로 "어떤 패키징 building block이 필요한지 / 어떤 challenge가 있는지 / 무엇을 해결해야 하는지"를 System Demand → Packaging Response → Physical Bottleneck → Roadmap 4단 구조로 설명. Essential/Relevant 매트릭스 표 포함. 추천 패키지 버튼으로 3D Explorer의 해당 구조로 바로 이동 가능
-  - **03 · Structure Map** — Fundamentals / Package Architectures / Commercial Technologies / Key Technologies / Challenges 5개 상위 카테고리로 구성된 접고 펼치는 트리. 각 노드 클릭 시 설명이 표시되고, 3D 구조와 매칭되는 노드는 "↗ 3D" 배지가 붙어 클릭하면 3D Explorer의 정확한 컴포넌트로 이동
+  - **02 · Applications** — AI/HPC, Smartphone, 5G/6G, Aerospace/Harsh 4개 응용분야별로 "어떤 패키징 building block이 필요한지 / 어떤 challenge가 있는지 / 무엇을 해결해야 하는지"를 짧은 문구 기반의 아이콘 대시보드(Demand → Response → Bottleneck → Roadmap 4분할 카드)로 설명. Essential/Relevant 매트릭스 표 포함. 추천 패키지 버튼으로 3D Explorer의 해당 구조로 바로 이동 가능
+  - **03 · Structure Map** — Fundamentals / Package Architectures / Commercial Technologies / Key Technologies / Challenges 5개 상위 카테고리를 **허브-스포크 마인드맵 스타일의 드릴다운 다이어그램**으로 표현 (기존의 평범한 텍스트 트리에서 완전히 재설계됨). 상단에 브레드크럼, 중앙에 현재 허브 카드, 하단에 자식 노드 카드 그리드가 배치되며, 자식 카드를 클릭하면 하위 카테고리로 드릴다운하거나(하위 노드가 있는 경우) 인라인으로 짧은 설명이 펼쳐짐(리프 노드인 경우). 3D 구조와 매칭되는 노드는 "View in 3D" 버튼이 붙어 클릭하면 3D Explorer의 정확한 컴포넌트로 이동
+  - **디자인 원칙**: 모든 텍스트는 짧은 문구/칩 형태로 압축, Font Awesome 아이콘을 전면에 사용, 출처/논문 인용 텍스트는 사이트 어디에도 표시하지 않음
   - **공개 읽기**: 누구나 접속해 모든 콘텐츠(4개 뷰 전체)를 볼 수 있음
   - **오너 전용 편집**: 로그인한 오너만 논문 추가/삭제, 노트 작성 가능 (Supabase RLS로 서버단 강제)
 
 ## 화면 구성 (상단 네비게이션)
 | 번호 | 뷰 | 설명 |
 |---|---|---|
-| 00 | Overview | 랜딩 페이지. 큰 틀 소개 + 프레임워크 스트립 + 3개 뷰 안내 카드 |
+| 00 | Overview | 랜딩 페이지. 아이콘 히어로 + 프레임워크 스텝퍼 + 3개 뷰 안내 카드 |
 | 01 | 3D Explorer | 7개 패키지(CoWoS-S, SoIC/Foveros, InFO/FOWLP, FCBGA, EMIB/UCIe, TSV Stack, Glass/PLP)를 3D로 탐색 |
-| 02 | Applications | 응용분야 × 패키징 매트릭스 + 4개 도메인별 상세 설명 |
-| 03 | Structure Map | 전체 패키징 기술 지형을 트리 구조로 탐색 |
+| 02 | Applications | 응용분야 × 패키징 매트릭스 + 4개 도메인별 아이콘 대시보드 |
+| 03 | Structure Map | 전체 패키징 기술 지형을 허브-스포크 마인드맵으로 드릴다운 탐색 |
 
 방문한 마지막 뷰는 `localStorage`(`advPkg.lastView`)에 저장되어, 다시 방문 시 이어서 표시됩니다 (콘텐츠 데이터 아님, UI 상태만).
 
@@ -29,8 +30,8 @@
 ## 데이터 아키텍처
 - **정적 콘텐츠**:
   - `data/packages.js` — 7개 패키지, ~50개 엘리먼트의 3D Explorer 콘텐츠 (하드코딩, 배포 시 함께 제공)
-  - `data/applications.js` — `window.APPLICATIONS`(4개 응용분야별 demand/response/bottleneck/roadmap + before/after 다이어그램 + 추천 패키지), `window.APP_MATRIX`(7개 building block × 4개 응용분야 essential/relevant/blank 매트릭스), `window.APP_FRAMEWORK`(6단계 로드맵 프레임워크). 출처: Mahajan et al., *Nature Reviews Electrical Engineering* 3, 254–263 (2026)
-  - `data/structure-tree.js` — `window.STRUCTURE_TREE` — Fundamentals/Package Architectures/Commercial Technologies/Key Technologies/Challenges 5개 브랜치를 가진 지식 트리. 각 노드는 설명(`desc`)과 3D Explorer로의 딥링크(`link: {packageId, elementId}`)를 가질 수 있음
+  - `data/applications.js` — `window.APPLICATIONS`(4개 응용분야별 demand/response/bottleneck/roadmap 짧은 문구 + from/to 다이어그램(chips) + 아이콘 + 추천 패키지), `window.APP_MATRIX`(7개 building block × 4개 응용분야 essential/relevant/blank 매트릭스, 컬럼별 아이콘 포함), `window.APP_FRAMEWORK`(6단계 로드맵 프레임워크, step/title/icon만). 사이트 내에는 출처/인용 텍스트를 표시하지 않음(내부 참고 자료: Mahajan et al., *Nature Reviews Electrical Engineering* 3, 254–263, 2026 — 텍스트는 재구성/압축되었고 일부는 참고 자료를 넘어 확장 작성됨)
+  - `data/structure-tree.js` — `window.STRUCTURE_TREE` — Fundamentals/Package Architectures/Commercial Technologies/Key Technologies/Challenges 5개 브랜치를 가진 지식 트리. 각 노드는 짧은 설명(`desc`, 한 문구), 아이콘(`icon`), 선택적 강조색(`color`)과 3D Explorer로의 딥링크(`link: {packageId, elementId}`)를 가질 수 있음
 - **동적 콘텐츠(Supabase Postgres)**:
   - `public.papers` — 사용자(오너)가 추가한 논문 (package_id, element_id, title, url, notes)
   - `public.notes` — 엘리먼트별 자유 노트 (package_id + element_id 당 1행)
@@ -59,9 +60,9 @@ webapp/
 │   ├── data-store.js           # Supabase CRUD 래퍼 (window.dataStore)
 │   ├── scene.js                 # Three.js 3D 씬 빌더 + 인터랙션 (window.PkgScene)
 │   ├── app.js                   # 상단 뷰 전환(window.AppNav) + 3D Explorer 탭/정보패널 로직
-│   ├── overview-view.js          # Overview 뷰 렌더링
-│   ├── applications-view.js      # Applications 뷰 렌더링 (탭, 매트릭스, 다이어그램)
-│   └── tree-view.js               # Structure Map 뷰 렌더링 (접고 펼치는 트리)
+│   ├── overview-view.js          # Overview 뷰 렌더링 (아이콘 히어로 + 스텝퍼 + 카드)
+│   ├── applications-view.js      # Applications 뷰 렌더링 (아이콘 탭, 매트릭스, from/to 다이어그램, 아이콘 쿼드런트)
+│   └── tree-view.js               # Structure Map 뷰 렌더링 (허브-스포크 마인드맵 드릴다운)
 └── supabase/schema.sql        # DB 스키마 + RLS 정책 (Supabase SQL Editor에서 실행)
 ```
 
@@ -71,7 +72,7 @@ webapp/
 - `window.AppNav.goToPackage(packageId, elementId?)` — Applications/Structure Map 뷰의 "3D로 보기" 버튼에서 호출. 3D Explorer로 전환하고, 해당 패키지 탭을 활성화하고(필요시 `elementId`까지 지정해 정확한 컴포넌트를 선택 상태로 만듦), 정보 패널에 상세 내용을 표시
 
 ## 사용자 가이드
-1. **일반 방문자**: 사이트 접속 → Overview에서 큰 그림 확인 → Applications에서 관심 응용분야의 요구사항/challenge 확인 → 추천 패키지 버튼 클릭 → 3D Explorer로 자동 이동해 해당 구조를 회전/분해/단면으로 탐색 → 또는 Structure Map에서 트리를 펼쳐가며 전체 기술 지형을 훑어보기
+1. **일반 방문자**: 사이트 접속 → Overview에서 큰 그림 확인 → Applications에서 관심 응용분야 아이콘 탭 클릭해 요구사항/challenge 확인 → 추천 패키지 버튼 클릭 → 3D Explorer로 자동 이동해 해당 구조를 회전/분해/단면으로 탐색 → 또는 Structure Map에서 카드를 클릭해 마인드맵을 드릴다운하며 전체 기술 지형을 훑어보기
 2. **오너(관리자)**: 우측 상단 "Log in" 클릭 → Supabase Auth에 등록된 이메일/비밀번호 입력 → 로그인 성공 시 3D Explorer 정보 패널에 "+ Add paper" 버튼과 노트 편집 textarea, 논문 삭제 버튼이 나타남
 
 ## 배포 상태
@@ -84,5 +85,5 @@ webapp/
 - Realtime 멀티탭 동기화는 `data-store.js`에 훅만 만들어둠 (`onChange` 구독은 app.js에서 아직 미사용)
 - 접근성(3D 콘텐츠의 스크린리더 지원, 리스트 뷰 대안)은 미구현
 - 반응형 레이아웃은 데스크톱 우선(≥1000px). Overview/Applications/Structure Map은 태블릿까지 대응하는 미디어쿼리를 넣었지만 3D Explorer 자체는 모바일 최적화 없음
-- Applications 뷰의 4개 도메인은 PPT 원본(AI/HPC, Smartphone, 5G/6G, Aerospace)을 기반으로 하되 일부 설명은 참고 자료를 바탕으로 확장 작성됨 — 추가 응용분야(예: 자동차, 데이터센터 네트워킹 등)를 원하면 `data/applications.js`에 도메인 객체를 추가하면 됨
+- Applications 뷰의 4개 도메인은 PPT 원본(AI/HPC, Smartphone, 5G/6G, Aerospace)을 기반으로 하되 텍스트는 짧은 문구로 압축/재구성되었고 일부는 참고 자료를 넘어 확장 작성됨 — 추가 응용분야(예: 자동차, 데이터센터 네트워킹 등)를 원하면 `data/applications.js`에 도메인 객체를 추가하면 됨
 - 커스텀 도메인 연결은 선택 사항 (Vercel에서 설정 가능)
