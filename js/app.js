@@ -348,11 +348,37 @@ function bindControls() {
   });
 }
 
-// ============ INIT ============
-function init() {
-  // Restore last-viewed package (UI-only state, kept in localStorage)
-  activePkgIdx = loadLastPkg();
-  if (!(activePkgIdx >= 0 && activePkgIdx < PACKAGES.length)) activePkgIdx = 0;
+// ============ TOP-LEVEL VIEW SWITCHING ============
+const VIEWS = ['overview', 'explorer', 'applications', 'structure'];
+const LASTVIEW_KEY = 'advPkg.lastView';
+let activeView = 'overview';
+let explorerScenePrimed = false; // Three.js scene is only init'd once, lazily, on first explorer visit
+
+function switchView(viewName, opts) {
+  opts = opts || {};
+  if (VIEWS.indexOf(viewName) === -1) viewName = 'overview';
+  activeView = viewName;
+  try { localStorage.setItem(LASTVIEW_KEY, viewName); } catch (e) {}
+
+  VIEWS.forEach(v => {
+    const sec = document.getElementById('view-' + v);
+    if (sec) sec.classList.toggle('active', v === viewName);
+  });
+  document.querySelectorAll('.view-nav-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.view === viewName);
+  });
+
+  if (viewName === 'explorer') {
+    ensureExplorerReady();
+    // Canvas was possibly hidden (display:none) while resizing/measuring — fix size now.
+    requestAnimationFrame(() => { if (window.PkgScene) window.PkgScene.resize(); });
+  }
+  if (!opts.silent) window.scrollTo(0, 0);
+}
+
+function ensureExplorerReady() {
+  if (explorerScenePrimed) return;
+  explorerScenePrimed = true;
 
   renderTabs();
 
@@ -393,6 +419,63 @@ function init() {
   // Hide loading
   const loading = document.getElementById('loading');
   if (loading) loading.style.display = 'none';
+}
+
+// Jump into the 3D Explorer at a specific package (and optionally a specific
+// element within it), from the Applications or Structure Map views.
+function goToPackage(packageId, elementId) {
+  const idx = PACKAGES.findIndex(p => p.id === packageId);
+  if (idx === -1) { console.warn('[app] goToPackage: unknown packageId', packageId); return; }
+
+  switchView('explorer');
+  ensureExplorerReady();
+
+  if (idx !== activePkgIdx) {
+    switchTab(idx);
+  }
+
+  if (elementId) {
+    // Wait a tick for loadPackage()/scene rebuild to finish before selecting.
+    requestAnimationFrame(() => {
+      const pkg = PACKAGES[idx];
+      const el = pkg.elements.find(e => e.id === elementId);
+      if (el) selectElement(el);
+    });
+  }
+}
+
+window.AppNav = {
+  switchView,
+  goToPackage,
+  getActiveView: () => activeView,
+  listPackages: () => PACKAGES.map(p => ({ id: p.id, name: p.name, short: p.short }))
+};
+
+// ============ INIT ============
+function init() {
+  // Restore last-viewed package (UI-only state, kept in localStorage)
+  activePkgIdx = loadLastPkg();
+  if (!(activePkgIdx >= 0 && activePkgIdx < PACKAGES.length)) activePkgIdx = 0;
+
+  // Top nav wiring
+  document.querySelectorAll('.view-nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchView(btn.dataset.view));
+  });
+
+  // Restore last top-level view (defaults to Overview on first-ever visit)
+  let startView = 'overview';
+  try {
+    const saved = localStorage.getItem(LASTVIEW_KEY);
+    if (saved && VIEWS.indexOf(saved) !== -1) startView = saved;
+  } catch (e) {}
+  switchView(startView, { silent: true });
+
+  // Loading overlay only matters for the 3D explorer; hide it immediately
+  // if we're not landing there so the Overview isn't blocked.
+  if (startView !== 'explorer') {
+    const loading = document.getElementById('loading');
+    if (loading) loading.style.display = 'none';
+  }
 }
 
 if (document.readyState === 'loading') {

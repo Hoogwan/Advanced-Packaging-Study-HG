@@ -588,6 +588,7 @@ window.PkgScene = {
   init, loadPackage,
   setExplode, setSection, setLayerVisible, frameCamera,
   selectElement,
+  resize: onResize,
   getState: ()=>state
 };
 })();
