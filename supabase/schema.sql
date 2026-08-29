@@ -139,6 +139,41 @@ CREATE TRIGGER notes_touch
 
 
 -- ============================================================
+-- Table: sketches  (freeform Sketchboard canvas — one row per board)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.sketches (
+  id           text PRIMARY KEY,        -- 'main' for the single personal board
+  data         jsonb NOT NULL DEFAULT '{}'::jsonb,
+  updated_at   timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.sketches ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS sketches_read_all     ON public.sketches;
+DROP POLICY IF EXISTS sketches_insert_owner ON public.sketches;
+DROP POLICY IF EXISTS sketches_update_owner ON public.sketches;
+DROP POLICY IF EXISTS sketches_delete_owner ON public.sketches;
+
+-- Anyone can VIEW the sketchboard (public site behavior)
+CREATE POLICY sketches_read_all ON public.sketches
+  FOR SELECT USING (true);
+
+-- Only the owner can draw / edit / clear it
+CREATE POLICY sketches_insert_owner ON public.sketches
+  FOR INSERT WITH CHECK (public.is_owner());
+
+CREATE POLICY sketches_update_owner ON public.sketches
+  FOR UPDATE USING (public.is_owner()) WITH CHECK (public.is_owner());
+
+CREATE POLICY sketches_delete_owner ON public.sketches
+  FOR DELETE USING (public.is_owner());
+
+DROP TRIGGER IF EXISTS sketches_touch ON public.sketches;
+CREATE TRIGGER sketches_touch
+  BEFORE UPDATE ON public.sketches
+  FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+
+-- ============================================================
 -- DONE
 -- ============================================================
 -- To sanity-check:  SELECT public.is_owner();

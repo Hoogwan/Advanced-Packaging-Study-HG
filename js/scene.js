@@ -1,5 +1,7 @@
-// Three.js scene builder for Advanced Packaging viewer
+// Three.js scene builder for Advanced Packaging viewer — premium infographic style
 // Exposes window.PkgScene with init(), loadPackage(pkg), and controls
+// Adds: studio-style lighting, material differentiation by category, tighter
+// isometric framing, and clickable leader-line labels for every component.
 
 (function(){
 'use strict';
@@ -24,10 +26,37 @@ let state = {
 let onSelectCb = null;
 let onHoverCb = null;
 
+/* ============ MATERIAL PRESETS (by category → gives each block a distinct
+   "made of" feel: silicon / metal / organic / glass / encapsulant) ========= */
+const CATEGORY_MATERIAL = {
+  'Active Die':          { metalness: 0.06, roughness: 0.30, clearcoat: 0.35, clearcoatRoughness: 0.18 },
+  'Interposer':          { metalness: 0.05, roughness: 0.28, clearcoat: 0.30, clearcoatRoughness: 0.20 },
+  'Bridge':              { metalness: 0.05, roughness: 0.28, clearcoat: 0.30, clearcoatRoughness: 0.20 },
+  'Interconnect':        { metalness: 0.82, roughness: 0.24, clearcoat: 0.25, clearcoatRoughness: 0.15 },
+  'Vertical Interconnect':{ metalness: 0.85, roughness: 0.22, clearcoat: 0.2,  clearcoatRoughness: 0.15 },
+  'RDL':                 { metalness: 0.78, roughness: 0.26, clearcoat: 0.2,  clearcoatRoughness: 0.18 },
+  'Thermal':             { metalness: 0.88, roughness: 0.18, clearcoat: 0.4,  clearcoatRoughness: 0.1 },
+  'Bonding':             { metalness: 0.55, roughness: 0.30, clearcoat: 0.3,  clearcoatRoughness: 0.15 },
+  'Substrate':           { metalness: 0.03, roughness: 0.72 },
+  'Board':                { metalness: 0.02, roughness: 0.75 },
+  'Encapsulant':         { metalness: 0.04, roughness: 0.58 },
+  'Memory':              { metalness: 0.10, roughness: 0.38, clearcoat: 0.2, clearcoatRoughness: 0.2 },
+  'Adhesive':            { metalness: 0.0,  roughness: 0.85 }
+};
+const DEFAULT_MATERIAL = { metalness: 0.15, roughness: 0.55 };
+
+function materialPresetFor(category, pkgId) {
+  if (category === 'Substrate' && pkgId === 'glass') {
+    return { glass: true, metalness: 0.0, roughness: 0.06, transmission: 0.55, thickness: 0.4, ior: 1.5, clearcoat: 0.6, clearcoatRoughness: 0.05 };
+  }
+  return CATEGORY_MATERIAL[category] || DEFAULT_MATERIAL;
+}
+
 /* ============ INIT ============ */
 function init(canvasEl, callbacks) {
   onSelectCb = callbacks.onSelect;
   onHoverCb = callbacks.onHover;
+  labelsRoot = callbacks.labelsRoot || document.getElementById('label-overlay');
 
   renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
@@ -35,44 +64,70 @@ function init(canvasEl, callbacks) {
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.localClippingEnabled = true;
+  renderer.physicallyCorrectLights = true;
+  if ('outputColorSpace' in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
+  else if ('outputEncoding' in renderer) renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.08;
 
   scene = new THREE.Scene();
 
-  // Isometric-ish orthographic camera
+  // Tighter isometric orthographic camera — bigger object presence, less dead space
   const aspect = canvasEl.clientWidth / canvasEl.clientHeight;
-  const d = 6;
+  const d = 4.6;
   camera = new THREE.OrthographicCamera(-d*aspect, d*aspect, d, -d, 0.1, 100);
   camera.position.set(9, 8, 12);
-  camera.lookAt(0, -0.5, 0);
+  camera.lookAt(0, -0.4, 0);
 
-  // Lights
-  const ambient = new THREE.AmbientLight(0xffffff, 0.55);
+  // ============ STUDIO-STYLE LIGHTING ============
+  // Soft sky/ground bounce (fills shadows softly, avoids flat/dark look)
+  const hemi = new THREE.HemisphereLight(0xf6f5f1, 0xd9d4c8, 0.55);
+  scene.add(hemi);
+  // Gentle ambient to lift blacks (subtle AO-like fill)
+  const ambient = new THREE.AmbientLight(0xffffff, 0.28);
   scene.add(ambient);
-  const dir = new THREE.DirectionalLight(0xffffff, 0.8);
-  dir.position.set(8, 15, 10);
-  dir.castShadow = true;
-  dir.shadow.mapSize.set(1024, 1024);
-  dir.shadow.camera.left = -10; dir.shadow.camera.right = 10;
-  dir.shadow.camera.top = 10; dir.shadow.camera.bottom = -10;
-  scene.add(dir);
-  const fill = new THREE.DirectionalLight(0xdde5ee, 0.35);
-  fill.position.set(-8, 6, -6);
+  // Key light: large soft shadows
+  const key = new THREE.DirectionalLight(0xfff8ee, 1.35);
+  key.position.set(7, 13, 9);
+  key.castShadow = true;
+  key.shadow.mapSize.set(2048, 2048);
+  key.shadow.camera.left = -9; key.shadow.camera.right = 9;
+  key.shadow.camera.top = 9; key.shadow.camera.bottom = -9;
+  key.shadow.camera.near = 1; key.shadow.camera.far = 30;
+  key.shadow.radius = 5;
+  key.shadow.bias = -0.0006;
+  scene.add(key);
+  // Fill light: cool, opposite side, low intensity — softens shadow contrast
+  const fill = new THREE.DirectionalLight(0xdfe8f2, 0.42);
+  fill.position.set(-9, 6, -7);
   scene.add(fill);
+  // Rim light: subtle warm backlight for edge definition / "premium" separation
+  const rim = new THREE.DirectionalLight(0xffe9cf, 0.30);
+  rim.position.set(-4, 4, -10);
+  scene.add(rim);
 
-  // Ground plane for shadow (barely visible)
+  // Soft studio floor: faint shadow-catcher + radial vignette falloff (canvas texture)
   const groundGeo = new THREE.PlaneGeometry(30, 30);
-  const groundMat = new THREE.ShadowMaterial({ opacity: 0.10 });
+  const groundMat = new THREE.ShadowMaterial({ opacity: 0.16 });
   const ground = new THREE.Mesh(groundGeo, groundMat);
   ground.rotation.x = -Math.PI/2;
-  ground.position.y = -2.5;
+  ground.position.y = -2.1;
   ground.receiveShadow = true;
   scene.add(ground);
+
+  const vignetteTex = makeRadialVignetteTexture();
+  const vignetteGeo = new THREE.PlaneGeometry(22, 22);
+  const vignetteMat = new THREE.MeshBasicMaterial({ map: vignetteTex, transparent: true, depthWrite: false });
+  const vignette = new THREE.Mesh(vignetteGeo, vignetteMat);
+  vignette.rotation.x = -Math.PI/2;
+  vignette.position.y = -2.11;
+  scene.add(vignette);
 
   // Controls
   controls = new THREE.OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
-  controls.target.set(0, -0.5, 0);
+  controls.target.set(0, -0.4, 0);
   controls.minZoom = 0.4;
   controls.maxZoom = 3;
 
@@ -87,11 +142,28 @@ function init(canvasEl, callbacks) {
   // Events
   canvasEl.addEventListener('click', onClick);
   canvasEl.addEventListener('pointermove', onMove);
-  canvasEl.addEventListener('pointerleave', ()=>{ hoveredId = null; if(onHoverCb) onHoverCb(null,0,0); });
+  canvasEl.addEventListener('pointerleave', ()=>{ hoveredId = null; if(onHoverCb) onHoverCb(null,0,0); updateHighlight(); });
   window.addEventListener('resize', onResize);
 
+  initLabelLayer();
   animate();
   onResize();
+}
+
+function makeRadialVignetteTexture() {
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const grad = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+  grad.addColorStop(0, 'rgba(20,18,14,0.13)');
+  grad.addColorStop(0.55, 'rgba(20,18,14,0.05)');
+  grad.addColorStop(1, 'rgba(20,18,14,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.needsUpdate = true;
+  return tex;
 }
 
 function onResize() {
@@ -100,18 +172,20 @@ function onResize() {
   const h = canvas.clientHeight;
   renderer.setSize(w, h, false);
   const aspect = w/h;
-  const d = 6;
+  const d = 4.6;
   camera.left = -d*aspect;
   camera.right = d*aspect;
   camera.top = d;
   camera.bottom = -d;
   camera.updateProjectionMatrix();
+  updateLabelPositions();
 }
 
 function animate() {
   requestAnimationFrame(animate);
   controls.update();
   renderer.render(scene, camera);
+  updateLabelPositions();
 }
 
 /* ============ LOAD PACKAGE ============ */
@@ -133,7 +207,7 @@ function loadPackage(pkg) {
   pkg.elements.forEach(el => pkg._layers.add(el.geo.layer));
 
   pkg.elements.forEach(el => {
-    const mesh = buildElement(el);
+    const mesh = buildElement(el, pkg);
     if (mesh) {
       mesh.userData.element = el;
       mesh.userData.baseY = el.geo.pos[1];
@@ -146,6 +220,7 @@ function loadPackage(pkg) {
   applyExplode();
   applySection();
   frameCamera('iso');
+  rebuildLabels(pkg);
 }
 
 function registerClickables(obj, el) {
@@ -168,20 +243,54 @@ function disposeGroup(g) {
 }
 
 /* ============ GEOMETRY BUILDERS ============ */
-function makeMat(color, opts) {
+function makeMat(color, opts, category, pkgId) {
   opts = opts || {};
-  const mat = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(color),
-    roughness: 0.55,
-    metalness: 0.15,
-    transparent: opts.opacity !== undefined,
-    opacity: opts.opacity !== undefined ? opts.opacity : 1,
-    side: opts.side || THREE.FrontSide,
-    clippingPlanes: renderer.clippingPlanes,
-    polygonOffset: true,
-    polygonOffsetFactor: 1,
-    polygonOffsetUnits: 1
-  });
+  const preset = materialPresetFor(category, pkgId);
+  const useGlass = !!preset.glass;
+  const baseOpacity = opts.opacity !== undefined ? opts.opacity : (useGlass ? 0.85 : 1);
+
+  let mat;
+  if (useGlass && THREE.MeshPhysicalMaterial) {
+    mat = new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color(color),
+      metalness: 0,
+      roughness: preset.roughness,
+      transmission: preset.transmission || 0,
+      thickness: preset.thickness || 0.3,
+      ior: preset.ior || 1.5,
+      clearcoat: preset.clearcoat || 0,
+      clearcoatRoughness: preset.clearcoatRoughness || 0.1,
+      transparent: true,
+      opacity: baseOpacity,
+      side: opts.side || THREE.FrontSide,
+      clippingPlanes: renderer.clippingPlanes,
+      polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1
+    });
+  } else if (THREE.MeshPhysicalMaterial) {
+    mat = new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color(color),
+      metalness: preset.metalness !== undefined ? preset.metalness : 0.15,
+      roughness: preset.roughness !== undefined ? preset.roughness : 0.55,
+      clearcoat: preset.clearcoat || 0,
+      clearcoatRoughness: preset.clearcoatRoughness !== undefined ? preset.clearcoatRoughness : 0.15,
+      transparent: opts.opacity !== undefined,
+      opacity: baseOpacity,
+      side: opts.side || THREE.FrontSide,
+      clippingPlanes: renderer.clippingPlanes,
+      polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1
+    });
+  } else {
+    mat = new THREE.MeshStandardMaterial({
+      color: new THREE.Color(color),
+      metalness: preset.metalness !== undefined ? preset.metalness : 0.15,
+      roughness: preset.roughness !== undefined ? preset.roughness : 0.55,
+      transparent: opts.opacity !== undefined,
+      opacity: baseOpacity,
+      side: opts.side || THREE.FrontSide,
+      clippingPlanes: renderer.clippingPlanes,
+      polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1
+    });
+  }
   if (opts.glow) {
     mat.emissive = new THREE.Color(color);
     mat.emissiveIntensity = 0.35;
@@ -191,22 +300,23 @@ function makeMat(color, opts) {
   return mat;
 }
 
-function buildElement(el) {
+function buildElement(el, pkg) {
   const g = el.geo;
   const opts = g.opts || {};
   const [sx, sy, sz] = g.size;
   const [px, py, pz] = g.pos;
+  const pkgId = pkg ? pkg.id : null;
 
   switch(g.type) {
     case 'box': {
       const geo = new THREE.BoxGeometry(sx, sy, sz);
-      const mesh = new THREE.Mesh(geo, makeMat(el.color, opts));
+      const mesh = new THREE.Mesh(geo, makeMat(el.color, opts, el.category, pkgId));
       mesh.position.set(px, py, pz);
       mesh.castShadow = true; mesh.receiveShadow = true;
       // subtle outline
       const edges = new THREE.EdgesGeometry(geo, 30);
       const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({
-        color: 0x1a1a17, transparent:true, opacity: 0.25,
+        color: 0x1a1a17, transparent:true, opacity: 0.22,
         clippingPlanes: renderer.clippingPlanes
       }));
       mesh.add(line);
@@ -217,18 +327,15 @@ function buildElement(el) {
       const group = new THREE.Group();
       group.position.set(px, py, pz);
       const nx = opts.nx || 10, nz = opts.nz || 10, r = opts.r || 0.1;
-      const marginX = sx - r*2*nx > 0 ? (sx - r*2*nx) / (nx+1) : 0;
-      const marginZ = sz - r*2*nz > 0 ? (sz - r*2*nz) / (nz+1) : 0;
       const stepX = (sx - r*2) / Math.max(1, nx-1);
       const stepZ = (sz - r*2) / Math.max(1, nz-1);
       const startX = -sx/2 + r;
       const startZ = -sz/2 + r;
-      const geo = new THREE.SphereGeometry(r, 12, 8);
-      const mat = makeMat(el.color, {});
-      mat.metalness = 0.55; mat.roughness = 0.3;
+      const geo = new THREE.SphereGeometry(r, 14, 10);
+      const mat = makeMat(el.color, {}, el.category, pkgId);
+      mat.metalness = 0.7; mat.roughness = 0.22;
       // Use instanced mesh for perf
       let count = nx * nz;
-      // skipRect: remove balls in center region (for bridge-carve-out)
       const skipR = opts.skipRect;
       const skipC = opts.skipCenter;
       const inst = new THREE.InstancedMesh(geo, mat, count);
@@ -260,8 +367,8 @@ function buildElement(el) {
       const tiers = opts.tiers || 1;
       const yStep = opts.yStep || 0;
       const geo = new THREE.CylinderGeometry(r, r, Math.max(sy, 0.008), 10);
-      const mat = makeMat(el.color, {});
-      mat.metalness = 0.7; mat.roughness = 0.25;
+      const mat = makeMat(el.color, {}, el.category, pkgId);
+      mat.metalness = 0.82; mat.roughness = 0.18;
       const total = nx * nz * tiers;
       const inst = new THREE.InstancedMesh(geo, mat, total);
       inst.castShadow = true;
@@ -290,8 +397,8 @@ function buildElement(el) {
       group.position.set(px, py, pz);
       const nx = opts.nx || 6, nz = opts.nz || 5, r = opts.r || 0.03, h = opts.h || sy;
       const geo = new THREE.CylinderGeometry(r, r, h, 12);
-      const mat = makeMat(el.color, {});
-      mat.metalness = 0.8; mat.roughness = 0.2;
+      const mat = makeMat(el.color, {}, el.category, pkgId);
+      mat.metalness = 0.88; mat.roughness = 0.16;
       const inst = new THREE.InstancedMesh(geo, mat, nx*nz);
       inst.castShadow = true;
       const dummy = new THREE.Object3D();
@@ -322,23 +429,23 @@ function buildElement(el) {
       const gap = 0.005;
       // base logic die (slightly wider/darker)
       const baseGeo = new THREE.BoxGeometry(sx*1.02, 0.09, sz*1.02);
-      const baseMat = makeMat('#5a1e1e', {});
+      const baseMat = makeMat('#5a1e1e', {}, 'Active Die', pkgId);
       const base = new THREE.Mesh(baseGeo, baseMat);
       base.position.y = 0;
       base.castShadow = base.receiveShadow = true;
       group.add(base);
       // stacked DRAM dies
       for (let i=0; i<n; i++){
-        const g = new THREE.BoxGeometry(sx, dieH, sz);
-        const m = makeMat(el.color, {});
-        m.roughness = 0.6;
-        const mesh = new THREE.Mesh(g, m);
+        const gg = new THREE.BoxGeometry(sx, dieH, sz);
+        const m = makeMat(el.color, {}, el.category, pkgId);
+        m.roughness = 0.35; m.metalness = 0.08;
+        const mesh = new THREE.Mesh(gg, m);
         mesh.position.y = 0.09/2 + dieH/2 + (dieH+gap)*i;
         mesh.castShadow = mesh.receiveShadow = true;
         // subtle edge
-        const ed = new THREE.EdgesGeometry(g, 30);
+        const ed = new THREE.EdgesGeometry(gg, 30);
         mesh.add(new THREE.LineSegments(ed, new THREE.LineBasicMaterial({
-          color: 0x0a0a0a, transparent:true, opacity:0.35,
+          color: 0x0a0a0a, transparent:true, opacity:0.3,
           clippingPlanes: renderer.clippingPlanes
         })));
         group.add(mesh);
@@ -353,14 +460,14 @@ function buildElement(el) {
       const dieH = sy;
       const gap = opts.gap || 0.01;
       for (let i=0; i<n; i++){
-        const g = new THREE.BoxGeometry(sx, dieH, sz);
-        const m = makeMat(el.color, {});
-        const mesh = new THREE.Mesh(g, m);
+        const gg = new THREE.BoxGeometry(sx, dieH, sz);
+        const m = makeMat(el.color, {}, el.category, pkgId);
+        const mesh = new THREE.Mesh(gg, m);
         mesh.position.y = i * (dieH + gap);
         mesh.castShadow = mesh.receiveShadow = true;
-        const ed = new THREE.EdgesGeometry(g, 30);
+        const ed = new THREE.EdgesGeometry(gg, 30);
         mesh.add(new THREE.LineSegments(ed, new THREE.LineBasicMaterial({
-          color: 0x0a0a0a, transparent:true, opacity:0.4,
+          color: 0x0a0a0a, transparent:true, opacity:0.35,
           clippingPlanes: renderer.clippingPlanes
         })));
         group.add(mesh);
@@ -371,11 +478,11 @@ function buildElement(el) {
     case 'moldCap': {
       // Transparent mold that hangs above the interposer showing where EMC sits
       const geo = new THREE.BoxGeometry(sx, sy, sz);
-      const mesh = new THREE.Mesh(geo, makeMat(el.color, opts));
+      const mesh = new THREE.Mesh(geo, makeMat(el.color, opts, el.category, pkgId));
       mesh.position.set(px, py, pz);
       const ed = new THREE.EdgesGeometry(geo, 30);
       mesh.add(new THREE.LineSegments(ed, new THREE.LineBasicMaterial({
-        color: 0x0a0a0a, transparent:true, opacity:0.2,
+        color: 0x0a0a0a, transparent:true, opacity:0.18,
         clippingPlanes: renderer.clippingPlanes
       })));
       return mesh;
@@ -384,13 +491,13 @@ function buildElement(el) {
     case 'lid': {
       // Metal lid: box with hollow inside (represented as flat plate + optional ring done separately)
       const geo = new THREE.BoxGeometry(sx, sy, sz);
-      const mat = makeMat(el.color, opts);
-      mat.metalness = 0.75; mat.roughness = 0.25;
+      const mat = makeMat(el.color, opts, el.category, pkgId);
+      mat.metalness = 0.85; mat.roughness = 0.18;
       const mesh = new THREE.Mesh(geo, mat);
       mesh.position.set(px, py, pz);
       const ed = new THREE.EdgesGeometry(geo, 30);
       mesh.add(new THREE.LineSegments(ed, new THREE.LineBasicMaterial({
-        color: 0x1a1a17, transparent:true, opacity:0.4,
+        color: 0x1a1a17, transparent:true, opacity:0.35,
         clippingPlanes: renderer.clippingPlanes
       })));
       return mesh;
@@ -415,7 +522,7 @@ function buildElement(el) {
       const geo = new THREE.ExtrudeGeometry(shape, { depth: sy, bevelEnabled:false });
       geo.rotateX(-Math.PI/2);
       geo.translate(0, sy, 0);
-      const mesh = new THREE.Mesh(geo, makeMat(el.color, {}));
+      const mesh = new THREE.Mesh(geo, makeMat(el.color, {}, el.category, pkgId));
       mesh.position.set(px, py-sy/2, pz);
       mesh.castShadow = true;
       return mesh;
@@ -504,6 +611,7 @@ function updateHighlight() {
       }
     }
   });
+  updateLabelActiveStates();
 }
 
 /* ============ CONTROLS ============ */
@@ -535,12 +643,7 @@ function applySection() {
   if (state.section <= 0.01) {
     renderer.clippingPlanes = [];
   } else {
-    // Cut from +X side moving toward -X
-    // Plane normal (-1, 0, 0), constant = right-x-limit
     const cutX = 5 - state.section * 10;   // sweeps from x=5 to x=-5
-    const plane = new THREE.Plane(new THREE.Vector3(-1, 0, 0), cutX * -1 + cutX);
-    // Actually: Plane defined by n·p + d = 0. keep p where n·p + d >= 0
-    // We want to keep points where x <= cutX, i.e., -x >= -cutX -> n=(-1,0,0), d = -(-cutX) = cutX... let's use simpler
     const p = new THREE.Plane(new THREE.Vector3(-1,0,0), cutX);
     renderer.clippingPlanes = [p];
   }
@@ -560,10 +663,11 @@ function setLayerVisible(elementId, visible) {
     const el = obj.userData.element;
     if (el && el.id === elementId) obj.visible = visible;
   });
+  updateLabelVisibility();
 }
 
 function frameCamera(preset) {
-  controls.target.set(0, -0.5, 0);
+  controls.target.set(0, -0.4, 0);
   const dist = 15;
   switch(preset) {
     case 'top':
@@ -582,6 +686,161 @@ function frameCamera(preset) {
   camera.zoom = 1;
   camera.updateProjectionMatrix();
   controls.update();
+}
+
+/* ============ LEADER-LINE LABELS ============
+   For every visible component, draw a small pill label on the left/right
+   edge of the viewport, connected to its 3D anchor point by an elbow leader
+   line (SVG). Clicking a label behaves exactly like clicking the 3D part. */
+let labelsRoot = null;
+let svgEl = null;
+let labelDefs = [];     // [{id, name, color, wrap, textEl}]
+let pathEls = {};       // id -> <path>
+let dotEls = {};        // id -> anchor <circle>
+
+function initLabelLayer() {
+  if (!labelsRoot) return;
+  labelsRoot.innerHTML = '';
+  svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svgEl.setAttribute('class', 'label-lines');
+  labelsRoot.appendChild(svgEl);
+}
+
+function rebuildLabels(pkg) {
+  if (!labelsRoot || !svgEl) return;
+  svgEl.innerHTML = '';
+  pathEls = {}; dotEls = {};
+  labelDefs.forEach(d => d.wrap.remove());
+  labelDefs = [];
+
+  pkg.elements.forEach(el => {
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('class', 'label-leader');
+    svgEl.appendChild(path);
+    pathEls[el.id] = path;
+
+    const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    dot.setAttribute('r', '3');
+    dot.setAttribute('class', 'label-anchor-dot');
+    dot.setAttribute('fill', el.color);
+    svgEl.appendChild(dot);
+    dotEls[el.id] = dot;
+
+    const wrap = document.createElement('div');
+    wrap.className = 'pkg-label';
+    wrap.dataset.eid = el.id;
+    wrap.innerHTML = `<span class="pkg-label-dot" style="background:${el.color}"></span><span class="pkg-label-text">${escapeHtml(el.name)}</span>`;
+    wrap.addEventListener('click', () => {
+      selectElement(el.id);
+      if (onSelectCb) onSelectCb(el);
+    });
+    wrap.addEventListener('pointerenter', () => { hoveredId = el.id; updateHighlight(); });
+    wrap.addEventListener('pointerleave', () => { hoveredId = null; updateHighlight(); });
+    labelsRoot.appendChild(wrap);
+    labelDefs.push({ id: el.id, name: el.name, color: el.color, wrap });
+  });
+
+  updateLabelPositions();
+  updateLabelActiveStates();
+}
+
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+}
+
+const projVec = new THREE.Vector3();
+
+function updateLabelPositions() {
+  if (!root || !camera || !renderer || !labelsRoot || labelDefs.length === 0) return;
+  const w = renderer.domElement.clientWidth;
+  const h = renderer.domElement.clientHeight;
+  if (!w || !h) return;
+  svgEl.setAttribute('width', w);
+  svgEl.setAttribute('height', h);
+  svgEl.setAttribute('viewBox', `0 0 ${w} ${h}`);
+
+  // Compute anchor screen coords for each element
+  const anchors = [];
+  root.children.forEach(obj => {
+    const el = obj.userData.element;
+    if (!el) return;
+    if (state.hidden.has(el.id)) return;
+    projVec.copy(obj.position);
+    projVec.project(camera);
+    const x = (projVec.x + 1) / 2 * w;
+    const y = (1 - projVec.y) / 2 * h;
+    anchors.push({ id: el.id, x, y, behind: projVec.z > 1 });
+  });
+
+  const leftBendX = Math.max(150, w * 0.16);
+  const rightBendX = w - Math.max(150, w * 0.16);
+  const midX = w / 2;
+
+  const left = anchors.filter(a => a.x < midX).sort((a,b) => a.y - b.y);
+  const right = anchors.filter(a => a.x >= midX).sort((a,b) => a.y - b.y);
+
+  distributeLabelY(left, h);
+  distributeLabelY(right, h);
+
+  [...left, ...right].forEach(a => {
+    const side = a.x < midX ? 'left' : 'right';
+    const bendX = side === 'left' ? leftBendX : rightBendX;
+    const wrap = labelDefs.find(d => d.id === a.id);
+    if (wrap) {
+      wrap.wrap.style.display = a.behind ? 'none' : 'flex';
+      wrap.wrap.style.top = a.labelY + 'px';
+      if (side === 'left') {
+        wrap.wrap.style.right = (w - bendX + 8) + 'px';
+        wrap.wrap.style.left = 'auto';
+        wrap.wrap.classList.add('side-left');
+        wrap.wrap.classList.remove('side-right');
+      } else {
+        wrap.wrap.style.left = (bendX + 8) + 'px';
+        wrap.wrap.style.right = 'auto';
+        wrap.wrap.classList.add('side-right');
+        wrap.wrap.classList.remove('side-left');
+      }
+    }
+    const path = pathEls[a.id];
+    const dot = dotEls[a.id];
+    if (path) {
+      path.setAttribute('d', a.behind ? '' : `M ${a.x},${a.y} L ${bendX},${a.y} L ${bendX},${a.labelY}`);
+    }
+    if (dot) {
+      dot.setAttribute('cx', a.x);
+      dot.setAttribute('cy', a.y);
+      dot.style.display = a.behind ? 'none' : 'block';
+    }
+  });
+}
+
+function distributeLabelY(list, height) {
+  const minGap = 22;
+  const margin = 16;
+  list.forEach(a => { a.labelY = Math.min(Math.max(a.y, margin), height - margin); });
+  // push down any overlapping labels (simple greedy pass)
+  for (let i = 1; i < list.length; i++) {
+    if (list[i].labelY < list[i-1].labelY + minGap) {
+      list[i].labelY = list[i-1].labelY + minGap;
+    }
+  }
+  // if overflowed bottom, pull everything back up
+  const overflow = list.length ? list[list.length-1].labelY - (height - margin) : 0;
+  if (overflow > 0) {
+    list.forEach(a => { a.labelY -= overflow; });
+  }
+}
+
+function updateLabelActiveStates() {
+  labelDefs.forEach(d => {
+    d.wrap.classList.toggle('active', d.id === selectedId);
+    d.wrap.classList.toggle('hovered', d.id === hoveredId);
+  });
+}
+
+function updateLabelVisibility() {
+  updateLabelPositions();
 }
 
 window.PkgScene = {

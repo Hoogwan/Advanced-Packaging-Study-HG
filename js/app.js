@@ -349,7 +349,7 @@ function bindControls() {
 }
 
 // ============ TOP-LEVEL VIEW SWITCHING ============
-const VIEWS = ['overview', 'explorer', 'applications', 'structure'];
+const VIEWS = ['overview', 'explorer', 'applications', 'structure', 'sketchboard'];
 const LASTVIEW_KEY = 'advPkg.lastView';
 let activeView = 'overview';
 let explorerScenePrimed = false; // Three.js scene is only init'd once, lazily, on first explorer visit
@@ -373,6 +373,10 @@ function switchView(viewName, opts) {
     // Canvas was possibly hidden (display:none) while resizing/measuring — fix size now.
     requestAnimationFrame(() => { if (window.PkgScene) window.PkgScene.resize(); });
   }
+  if (viewName === 'sketchboard') {
+    // Canvas was possibly hidden (display:none) while resizing/measuring — fix size now.
+    requestAnimationFrame(() => { if (window.SketchboardView) window.SketchboardView.resize(); });
+  }
   if (!opts.silent) window.scrollTo(0, 0);
 }
 
@@ -383,6 +387,7 @@ function ensureExplorerReady() {
   renderTabs();
 
   window.PkgScene.init(document.getElementById('three-canvas'), {
+    labelsRoot: document.getElementById('label-overlay'),
     onSelect: (el) => {
       if (el) selectElement(el);
       else { activeElementId = null; currentEl = null; renderInfoEmpty(); }

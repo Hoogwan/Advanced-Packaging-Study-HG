@@ -90,12 +90,12 @@
 
   function ensureWidget() {
     if (widgetEl) return widgetEl;
-    const header = document.querySelector('.header-meta') || document.querySelector('header.site-header');
+    const header = document.querySelector('header.site-header');
     if (!header) return null;
     widgetEl = document.createElement('div');
     widgetEl.id = 'auth-widget';
     widgetEl.className = 'auth-widget';
-    header.parentElement.appendChild(widgetEl);
+    header.appendChild(widgetEl);
     document.addEventListener('click', (e) => {
       const popover = document.getElementById('auth-popover');
       if (!popover) return;

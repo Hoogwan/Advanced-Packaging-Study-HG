@@ -73,6 +73,26 @@
       if (error) throw error;
     },
 
+    // ---------- Sketchboard (single freeform board, JSON blob) ----------
+    async getSketch(id) {
+      const client = getClient();
+      const { data, error } = await client
+        .from('sketches')
+        .select('data, updated_at')
+        .eq('id', id)
+        .maybeSingle();
+      if (error) { console.error('[dataStore] getSketch error', error); return null; }
+      return data ? { data: data.data || {}, updatedAt: data.updated_at } : null;
+    },
+
+    async setSketch(id, dataObj) {
+      const client = getClient();
+      const { error } = await client
+        .from('sketches')
+        .upsert({ id, data: dataObj }, { onConflict: 'id' });
+      if (error) throw error;
+    },
+
     // ---------- Realtime (optional multi-tab sync) ----------
     onChange(cb) {
       changeListeners.push(cb);
@@ -89,6 +109,7 @@
         .channel('public:papers-notes')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'papers' }, (payload) => notifyChange({ table: 'papers', payload }))
         .on('postgres_changes', { event: '*', schema: 'public', table: 'notes' }, (payload) => notifyChange({ table: 'notes', payload }))
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'sketches' }, (payload) => notifyChange({ table: 'sketches', payload }))
         .subscribe();
     }
   };

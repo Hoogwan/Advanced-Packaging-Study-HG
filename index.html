@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Advanced Packaging · An Interactive Atlas</title>
+<title>Advanced Packaging Atlas · Hoogwan Lee</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,26 +16,30 @@
 
 <header class="site-header">
   <div class="brand">
-    <span class="brand-mark">Advanced Packaging</span>
-    <span class="brand-sub">an interactive atlas</span>
+    <span class="brand-icon"><i class="fa-solid fa-microchip"></i></span>
+    <span class="brand-text">
+      <span class="brand-mark">Advanced Packaging <span class="brand-mark-accent">Atlas</span></span>
+      <span class="brand-author"><i class="fa-solid fa-pen-fancy"></i> Hoogwan Lee</span>
+    </span>
   </div>
 
   <nav class="view-nav" id="view-nav">
     <button class="view-nav-btn" data-view="overview">
-      <span class="view-nav-num">00</span><span>Overview</span>
+      <i class="fa-solid fa-house view-nav-icon"></i><span>Overview</span>
     </button>
     <button class="view-nav-btn" data-view="explorer">
-      <span class="view-nav-num">01</span><span>3D Explorer</span>
+      <i class="fa-solid fa-cube view-nav-icon"></i><span>3D Explorer</span>
     </button>
     <button class="view-nav-btn" data-view="applications">
-      <span class="view-nav-num">02</span><span>Applications</span>
+      <i class="fa-solid fa-satellite-dish view-nav-icon"></i><span>Applications</span>
     </button>
     <button class="view-nav-btn" data-view="structure">
-      <span class="view-nav-num">03</span><span>Structure Map</span>
+      <i class="fa-solid fa-diagram-project view-nav-icon"></i><span>Structure Map</span>
+    </button>
+    <button class="view-nav-btn" data-view="sketchboard">
+      <i class="fa-solid fa-palette view-nav-icon"></i><span>Sketchboard</span>
     </button>
   </nav>
-
-  <div class="header-meta">v1.1 · Click components to explore</div>
 </header>
 
 <!-- ============ VIEW: OVERVIEW (big-picture landing) ============ -->
@@ -58,6 +62,7 @@
 
       <canvas id="three-canvas"></canvas>
       <div id="hover-tip"></div>
+      <div id="label-overlay" class="label-overlay"></div>
 
       <div class="layer-panel" id="layer-panel"></div>
 
@@ -106,6 +111,11 @@
   <div id="structure-root" class="structure-root"></div>
 </section>
 
+<!-- ============ VIEW: SKETCHBOARD (freeform whiteboard) ============ -->
+<section class="app-view" id="view-sketchboard">
+  <div id="sketchboard-root" class="sketchboard-root"></div>
+</section>
+
 <!-- Three.js from CDN -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -129,6 +139,7 @@
 <script src="js/overview-view.js"></script>
 <script src="js/applications-view.js"></script>
 <script src="js/tree-view.js"></script>
+<script src="js/sketchboard-view.js"></script>
 
 </body>
 </html>
