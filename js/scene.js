@@ -712,6 +712,7 @@ function rebuildLabels(pkg) {
   pathEls = {}; dotEls = {};
   labelDefs.forEach(d => d.wrap.remove());
   labelDefs = [];
+  Object.keys(labelSide).forEach(k => delete labelSide[k]);
 
   pkg.elements.forEach(el => {
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -751,6 +752,11 @@ function escapeHtml(s) {
 
 const projVec = new THREE.Vector3();
 
+// Per-id side memory ('left' | 'right'), used as hysteresis so a label near
+// the screen's vertical centerline doesn't flip left/right every frame while
+// orbiting the camera (that flipping was part of what looked like "flicker").
+const labelSide = {};
+
 function updateLabelPositions() {
   if (!root || !camera || !renderer || !labelsRoot || labelDefs.length === 0) return;
   const w = renderer.domElement.clientWidth;
@@ -773,18 +779,31 @@ function updateLabelPositions() {
     anchors.push({ id: el.id, x, y, behind: projVec.z > 1 });
   });
 
-  const leftBendX = Math.max(150, w * 0.16);
-  const rightBendX = w - Math.max(150, w * 0.16);
+  const leftBendX = Math.max(150, w * 0.18);
+  const rightBendX = w - Math.max(150, w * 0.18);
   const midX = w / 2;
+  const hysteresis = 40; // px of "dead zone" around center before a label switches sides
 
-  const left = anchors.filter(a => a.x < midX).sort((a,b) => a.y - b.y);
-  const right = anchors.filter(a => a.x >= midX).sort((a,b) => a.y - b.y);
+  anchors.forEach(a => {
+    const prevSide = labelSide[a.id];
+    if (!prevSide) {
+      labelSide[a.id] = a.x < midX ? 'left' : 'right';
+    } else if (prevSide === 'left' && a.x > midX + hysteresis) {
+      labelSide[a.id] = 'right';
+    } else if (prevSide === 'right' && a.x < midX - hysteresis) {
+      labelSide[a.id] = 'left';
+    }
+    a.side = labelSide[a.id];
+  });
+
+  const left = anchors.filter(a => a.side === 'left').sort((a, b) => a.y - b.y);
+  const right = anchors.filter(a => a.side === 'right').sort((a, b) => a.y - b.y);
 
   distributeLabelY(left, h);
   distributeLabelY(right, h);
 
   [...left, ...right].forEach(a => {
-    const side = a.x < midX ? 'left' : 'right';
+    const side = a.side;
     const bendX = side === 'left' ? leftBendX : rightBendX;
     const wrap = labelDefs.find(d => d.id === a.id);
     if (wrap) {
@@ -805,6 +824,8 @@ function updateLabelPositions() {
     const path = pathEls[a.id];
     const dot = dotEls[a.id];
     if (path) {
+      // Small vertical elbow before the horizontal run makes the line easier to
+      // trace back to its pill when many labels are stacked closely.
       path.setAttribute('d', a.behind ? '' : `M ${a.x},${a.y} L ${bendX},${a.y} L ${bendX},${a.labelY}`);
     }
     if (dot) {
@@ -815,20 +836,36 @@ function updateLabelPositions() {
   });
 }
 
+function getLabelPillHeight() {
+  // Measure the ACTUAL rendered height of a label pill (font-size/padding are
+  // fixed in CSS, so any existing pill is representative). Falls back to a
+  // generous estimate if nothing is in the DOM yet.
+  const sample = labelsRoot && labelsRoot.querySelector('.pkg-label');
+  const h = sample ? sample.getBoundingClientRect().height : 0;
+  return h > 0 ? h : 26;
+}
+
 function distributeLabelY(list, height) {
-  const minGap = 22;
-  const margin = 16;
-  list.forEach(a => { a.labelY = Math.min(Math.max(a.y, margin), height - margin); });
-  // push down any overlapping labels (simple greedy pass)
+  if (!list.length) return;
+  // Gap = full pill height + fixed breathing room, so pills never touch or
+  // overlap even when many anchors land at nearly the same screen Y (common
+  // for stacked package layers). No compression is ever applied afterwards —
+  // if everything doesn't fit within the margins, the whole stack is allowed
+  // to spill upward past the top margin rather than squeezing labels together.
+  const minGap = getLabelPillHeight() + 14;
+  const margin = 18;
+
+  list[0].labelY = Math.min(Math.max(list[0].y, margin), height - margin);
   for (let i = 1; i < list.length; i++) {
-    if (list[i].labelY < list[i-1].labelY + minGap) {
-      list[i].labelY = list[i-1].labelY + minGap;
-    }
+    const natural = Math.min(Math.max(list[i].y, margin), height - margin);
+    list[i].labelY = Math.max(natural, list[i - 1].labelY + minGap);
   }
-  // if overflowed bottom, pull everything back up
-  const overflow = list.length ? list[list.length-1].labelY - (height - margin) : 0;
-  if (overflow > 0) {
-    list.forEach(a => { a.labelY -= overflow; });
+
+  // If the stack overflows past the bottom margin, shift the WHOLE stack up
+  // (allowed to go above the top margin — "push up" is fine per design intent).
+  const bottomOverflow = list[list.length - 1].labelY - (height - margin);
+  if (bottomOverflow > 0) {
+    list.forEach(a => { a.labelY -= bottomOverflow; });
   }
 }
 

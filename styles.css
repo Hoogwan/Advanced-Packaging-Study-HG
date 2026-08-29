@@ -484,8 +484,8 @@ input[type="range"]::-moz-range-thumb {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 9px 3px 7px;
-  background: rgba(255,255,255,0.88);
+  padding: 4px 10px 4px 8px;
+  background: rgba(255,255,255,0.92);
   backdrop-filter: blur(6px);
   border: 1px solid var(--border);
   border-radius: 20px;
@@ -496,8 +496,14 @@ input[type="range"]::-moz-range-thumb {
   white-space: nowrap;
   pointer-events: auto;
   cursor: pointer;
-  transition: all 0.15s;
+  /* IMPORTANT: only transition color/background, NEVER position (top/left/right).
+     These are updated every animation frame while rotating the 3D view; a
+     position transition fights that per-frame update and causes visible
+     jitter/flicker + the leader line (drawn at the exact live coordinate)
+     to visually detach from the lagging label pill. */
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
   box-shadow: 0 1px 4px rgba(20,18,14,0.05);
+  will-change: top, left, right;
 }
 .pkg-label-dot {
   width: 7px; height: 7px;
