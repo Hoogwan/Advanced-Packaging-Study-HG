@@ -689,12 +689,27 @@ function frameCamera(preset) {
 }
 
 /* ============ LEADER-LINE LABELS ============
-   For every visible component, draw a small pill label on the left/right
-   edge of the viewport, connected to its 3D anchor point by an elbow leader
-   line (SVG). Clicking a label behaves exactly like clicking the 3D part. */
+   Every visible component gets a small pill label that sits just outside its
+   own part on screen and is tied to it by a short leader line. Everything is
+   recomputed from the 3D geometry every frame, so labels and lines travel
+   with the model while you rotate, zoom, pan, explode or cut it.
+
+   Per frame, for each component:
+     1. Take its 3D bounding box (current exploded position, clipped by the
+        cross-section plane) and project the 8 corners → screen rectangle.
+     2. Pick the anchor: the centre of the box face that faces the camera and
+        points most toward the label's side, so the dot sits on a VISIBLE
+        surface rather than the hidden centre of a stacked layer.
+     3. Choose a side (left/right) from where the part sits relative to the
+        model centre; parts in the middle alternate sides by height so
+        stacked layers split evenly.
+     4. Place the pill just outside the part's own screen extent at the
+        anchor's height, then push overlapping pills apart and out of the
+        viewer's UI panels (title, layer list, controls, hint).
+   Clicking a label behaves exactly like clicking the 3D part. */
 let labelsRoot = null;
 let svgEl = null;
-let labelDefs = [];     // [{id, name, color, wrap, textEl}]
+let labelDefs = [];     // [{id, el, obj, wrap, localMin, localMax, w, h, cur}]
 let pathEls = {};       // id -> <path>
 let dotEls = {};        // id -> anchor <circle>
 
@@ -704,6 +719,10 @@ function initLabelLayer() {
   svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svgEl.setAttribute('class', 'label-lines');
   labelsRoot.appendChild(svgEl);
+  // Pill widths change once web fonts arrive — re-measure then.
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(() => { measureLabels(); });
+  }
 }
 
 function rebuildLabels(pkg) {
@@ -713,8 +732,19 @@ function rebuildLabels(pkg) {
   labelDefs.forEach(d => d.wrap.remove());
   labelDefs = [];
   Object.keys(labelSide).forEach(k => delete labelSide[k]);
+  Object.keys(altSide).forEach(k => delete altSide[k]);
+
+  // Map element id → its root child object (for live position + geometry)
+  const objById = {};
+  root.children.forEach(obj => {
+    const el = obj.userData.element;
+    if (el) objById[el.id] = obj;
+  });
 
   pkg.elements.forEach(el => {
+    const obj = objById[el.id];
+    if (!obj) return;
+
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     path.setAttribute('class', 'label-leader');
     svgEl.appendChild(path);
@@ -738,11 +768,49 @@ function rebuildLabels(pkg) {
     wrap.addEventListener('pointerenter', () => { hoveredId = el.id; updateHighlight(); });
     wrap.addEventListener('pointerleave', () => { hoveredId = null; updateHighlight(); });
     labelsRoot.appendChild(wrap);
-    labelDefs.push({ id: el.id, name: el.name, color: el.color, wrap });
+
+    const box = localBoxFor(obj, el);
+    labelDefs.push({ id: el.id, el, obj, wrap, localMin: box.min, localMax: box.max, w: 0, h: 0, cur: null });
   });
 
-  updateLabelPositions();
+  // Stacked parts near the model's centre alternate left/right by height,
+  // so a 10-layer stack puts ~5 labels on each side instead of 10 on one.
+  labelDefs
+    .slice()
+    .sort((a, b) => (a.localMin.y + a.obj.userData.baseY) - (b.localMin.y + b.obj.userData.baseY))
+    .forEach((d, i) => { altSide[d.id] = i % 2 === 0 ? 'left' : 'right'; });
+
+  measureLabels();
+  updateLabelPositions(true);
   updateLabelActiveStates();
+}
+
+// Bounding box of a component in its own local frame (relative to obj.position).
+// Box3.setFromObject() ignores per-instance offsets of InstancedMesh (ball /
+// pad / TSV grids), so those fall back to the declared geo.size, which is
+// what the grid builders fill.
+function localBoxFor(obj, el) {
+  let hasInstanced = false;
+  obj.traverse(o => { if (o.isInstancedMesh) hasInstanced = true; });
+  if (!hasInstanced) {
+    obj.updateMatrixWorld(true);
+    const b = new THREE.Box3().setFromObject(obj);
+    if (!b.isEmpty()) {
+      return { min: b.min.clone().sub(obj.position), max: b.max.clone().sub(obj.position) };
+    }
+  }
+  const [sx, sy, sz] = el.geo.size;
+  return {
+    min: new THREE.Vector3(-sx / 2, -sy / 2, -sz / 2),
+    max: new THREE.Vector3(sx / 2, sy / 2, sz / 2),
+  };
+}
+
+function measureLabels() {
+  labelDefs.forEach(d => {
+    d.w = d.wrap.offsetWidth || 120;
+    d.h = d.wrap.offsetHeight || 24;
+  });
 }
 
 function escapeHtml(s) {
@@ -751,13 +819,50 @@ function escapeHtml(s) {
 }
 
 const projVec = new THREE.Vector3();
+const _bmin = new THREE.Vector3();
+const _bmax = new THREE.Vector3();
+const _p = new THREE.Vector3();
+const _toCam = new THREE.Vector3();
 
-// Per-id side memory ('left' | 'right'), used as hysteresis so a label near
-// the screen's vertical centerline doesn't flip left/right every frame while
-// orbiting the camera (that flipping was part of what looked like "flicker").
+// Per-id side memory ('left' | 'right') — hysteresis so a label near the
+// model's centre doesn't flip sides every frame while orbiting.
 const labelSide = {};
+const altSide = {};   // default side for parts sitting in the model's middle
 
-function updateLabelPositions() {
+const FACE_NORMALS = [
+  [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1],
+];
+
+let _frame = 0;
+let _lastLabelT = 0;
+
+function toScreen(v, w, h, out) {
+  projVec.copy(v).project(camera);
+  out.x = (projVec.x + 1) / 2 * w;
+  out.y = (1 - projVec.y) / 2 * h;
+  out.z = projVec.z;
+  return out;
+}
+
+// UI panels inside the viewer that labels must not sit under.
+function obstacleRects() {
+  const base = labelsRoot.getBoundingClientRect();
+  const viewer = labelsRoot.parentElement;
+  if (!viewer) return [];
+  const sel = ['.viewer-title', '.layer-panel', '.controls', '.hint'];
+  const rects = [];
+  sel.forEach(s => {
+    const n = viewer.querySelector(s);
+    if (!n || n.offsetParent === null) return;
+    const r = n.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) return;
+    rects.push({ x0: r.left - base.left - 6, y0: r.top - base.top - 6, x1: r.right - base.left + 6, y1: r.bottom - base.top + 6 });
+  });
+  return rects;
+}
+let _obstacles = [];
+
+function updateLabelPositions(snap) {
   if (!root || !camera || !renderer || !labelsRoot || labelDefs.length === 0) return;
   const w = renderer.domElement.clientWidth;
   const h = renderer.domElement.clientHeight;
@@ -766,107 +871,189 @@ function updateLabelPositions() {
   svgEl.setAttribute('height', h);
   svgEl.setAttribute('viewBox', `0 0 ${w} ${h}`);
 
-  // Compute anchor screen coords for each element
-  const anchors = [];
-  root.children.forEach(obj => {
-    const el = obj.userData.element;
-    if (!el) return;
-    if (state.hidden.has(el.id)) return;
-    projVec.copy(obj.position);
-    projVec.project(camera);
-    const x = (projVec.x + 1) / 2 * w;
-    const y = (1 - projVec.y) / 2 * h;
-    anchors.push({ id: el.id, x, y, behind: projVec.z > 1 });
-  });
+  // Panels can collapse / reflow — refresh their rects a few times a second.
+  if (snap || _frame % 15 === 0) _obstacles = obstacleRects();
+  if (_frame % 90 === 0) measureLabels();
+  _frame++;
 
-  const leftBendX = Math.max(150, w * 0.18);
-  const rightBendX = w - Math.max(150, w * 0.18);
-  const midX = w / 2;
-  const hysteresis = 40; // px of "dead zone" around center before a label switches sides
+  // Cross-section keeps x <= cutX (see applySection)
+  const cutX = state.section > 0.01 ? 5 - state.section * 10 : Infinity;
+  camera.getWorldDirection(_toCam).negate();
 
-  anchors.forEach(a => {
-    const prevSide = labelSide[a.id];
-    if (!prevSide) {
-      labelSide[a.id] = a.x < midX ? 'left' : 'right';
-    } else if (prevSide === 'left' && a.x > midX + hysteresis) {
-      labelSide[a.id] = 'right';
-    } else if (prevSide === 'right' && a.x < midX - hysteresis) {
-      labelSide[a.id] = 'left';
+  // ---- 1. project every visible part ----
+  const items = [];
+  let mMinX = Infinity, mMaxX = -Infinity;
+  labelDefs.forEach(d => {
+    const obj = d.obj;
+    const hidden = state.hidden.has(d.id) || !obj.visible;
+    _bmin.copy(d.localMin).add(obj.position);
+    _bmax.copy(d.localMax).add(obj.position);
+    if (_bmax.x > cutX) _bmax.x = cutX;
+    if (hidden || _bmin.x >= _bmax.x) { items.push({ d, hidden: true }); return; }
+
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    const s = { x: 0, y: 0, z: 0 };
+    for (let i = 0; i < 8; i++) {
+      _p.set(i & 1 ? _bmax.x : _bmin.x, i & 2 ? _bmax.y : _bmin.y, i & 4 ? _bmax.z : _bmin.z);
+      toScreen(_p, w, h, s);
+      x0 = Math.min(x0, s.x); x1 = Math.max(x1, s.x);
+      y0 = Math.min(y0, s.y); y1 = Math.max(y1, s.y);
     }
-    a.side = labelSide[a.id];
+    const c = new THREE.Vector3().addVectors(_bmin, _bmax).multiplyScalar(0.5);
+    const half = new THREE.Vector3().subVectors(_bmax, _bmin).multiplyScalar(0.5);
+    const sc = toScreen(c, w, h, { x: 0, y: 0, z: 0 });
+    mMinX = Math.min(mMinX, x0); mMaxX = Math.max(mMaxX, x1);
+    items.push({ d, hidden: false, c, half, sc, rect: { x0, x1, y0, y1 } });
   });
 
-  const left = anchors.filter(a => a.side === 'left').sort((a, b) => a.y - b.y);
-  const right = anchors.filter(a => a.side === 'right').sort((a, b) => a.y - b.y);
+  const visible = items.filter(it => !it.hidden);
+  const modelW = Math.max(1, mMaxX - mMinX);
+  const modelCX = (mMinX + mMaxX) / 2;
 
-  distributeLabelY(left, h);
-  distributeLabelY(right, h);
+  // ---- 2. side + anchor + desired pill position ----
+  const dz = modelW * 0.08;
+  visible.forEach(it => {
+    const id = it.d.id;
+    const dx = it.sc.x - modelCX;
+    const prev = labelSide[id];
+    let side;
+    if (prev && Math.abs(dx) < dz * 1.8) side = prev;
+    else if (dx < -dz) side = 'left';
+    else if (dx > dz) side = 'right';
+    else side = prev || altSide[id] || 'left';
+    labelSide[id] = side;
+    const sgn = side === 'left' ? -1 : 1;
+    it.side = side;
 
-  [...left, ...right].forEach(a => {
-    const side = a.side;
-    const bendX = side === 'left' ? leftBendX : rightBendX;
-    const wrap = labelDefs.find(d => d.id === a.id);
-    if (wrap) {
-      wrap.wrap.style.display = a.behind ? 'none' : 'flex';
-      wrap.wrap.style.top = a.labelY + 'px';
-      if (side === 'left') {
-        wrap.wrap.style.right = (w - bendX + 8) + 'px';
-        wrap.wrap.style.left = 'auto';
-        wrap.wrap.classList.add('side-left');
-        wrap.wrap.classList.remove('side-right');
-      } else {
-        wrap.wrap.style.left = (bendX + 8) + 'px';
-        wrap.wrap.style.right = 'auto';
-        wrap.wrap.classList.add('side-right');
-        wrap.wrap.classList.remove('side-left');
+    // Anchor: centre of the camera-facing face that points most toward our
+    // side, nudged a little toward that side within the face.
+    let best = null, bestScore = -Infinity;
+    const tmp = { x: 0, y: 0, z: 0 };
+    FACE_NORMALS.forEach(n => {
+      const facing = n[0] * _toCam.x + n[1] * _toCam.y + n[2] * _toCam.z;
+      if (facing < 0.15) return;
+      _p.set(it.c.x + n[0] * it.half.x, it.c.y + n[1] * it.half.y, it.c.z + n[2] * it.half.z);
+      toScreen(_p, w, h, tmp);
+      const ddx = tmp.x - it.sc.x, ddy = tmp.y - it.sc.y;
+      const len = Math.hypot(ddx, ddy);
+      const toward = len > 0.5 ? (ddx * sgn) / len : 0;
+      const score = toward + facing * 0.8;
+      if (score > bestScore) { bestScore = score; best = n; }
+    });
+    if (!best) best = [0, 1, 0];
+    const a = new THREE.Vector3(
+      it.c.x + best[0] * it.half.x,
+      it.c.y + best[1] * it.half.y,
+      it.c.z + best[2] * it.half.z
+    );
+    // In-plane nudge: along whichever in-face axis moves furthest sideways on screen
+    let nudgeAxis = -1, nudgeDx = 0;
+    const origin = toScreen(a, w, h, { x: 0, y: 0, z: 0 });
+    for (let ax = 0; ax < 3; ax++) {
+      if (best[ax] !== 0) continue;
+      _p.copy(a); _p.setComponent(ax, _p.getComponent(ax) + 1);
+      toScreen(_p, w, h, tmp);
+      const ddx = tmp.x - origin.x;
+      if (Math.abs(ddx) > Math.abs(nudgeDx)) { nudgeDx = ddx; nudgeAxis = ax; }
+    }
+    if (nudgeAxis >= 0) {
+      const halfAx = it.half.getComponent(nudgeAxis);
+      const dir = Math.sign(nudgeDx) * sgn;
+      a.setComponent(nudgeAxis, a.getComponent(nudgeAxis) + dir * halfAx * 0.35);
+    }
+    it.anchor = toScreen(a, w, h, { x: 0, y: 0, z: 0 });
+
+    // Pill sits just outside this part's own screen extent, at the anchor's height.
+    const pw = it.d.w || 120, ph = it.d.h || 24;
+    const gap = 22;
+    let edgeX = side === 'left'
+      ? Math.min(it.rect.x0, it.anchor.x - 28) - gap
+      : Math.max(it.rect.x1, it.anchor.x + 28) + gap;
+    // box = pill rect (x0..x1, centre y)
+    let bx0 = side === 'left' ? edgeX - pw : edgeX;
+    bx0 = Math.min(Math.max(bx0, 6), w - pw - 6);
+    it.box = { x0: bx0, x1: bx0 + pw, cy: it.anchor.y, h: ph };
+  });
+
+  // ---- 3. place pills without overlap ----
+  // Greedy, top-to-bottom by anchor height: each pill takes the free slot
+  // nearest to its anchor's height (searching up and down), never covering an
+  // already placed pill or a UI panel. If a UI panel is in the way at that
+  // height, the pill first tries sliding sideways past it (toward the model).
+  const vGap = 4;
+  const placed = [];
+  const hits = (x0, x1, top, bot, r) => !(x1 <= r.x0 || x0 >= r.x1 || bot <= r.y0 || top >= r.y1);
+  const tryAt = (it, cy) => {
+    const B = it.box, pw = B.x1 - B.x0, hh = B.h / 2;
+    if (cy - hh < 6 || cy + hh > h - 6) return null;
+    let x0 = B.x0;
+    for (let pass = 0; pass < 2; pass++) {
+      const o = _obstacles.find(r => hits(x0, x0 + pw, cy - hh, cy + hh, r));
+      if (!o) break;
+      if (pass === 1) return null;
+      const goRight = (o.x0 + o.x1) / 2 < modelCX;
+      x0 = goRight ? o.x1 : o.x0 - pw;
+      if (x0 < 6 || x0 + pw > w - 6) return null;
+    }
+    if (_obstacles.some(r => hits(x0, x0 + pw, cy - hh, cy + hh, r))) return null;
+    const clash = placed.some(p =>
+      !(x0 + pw <= p.x0 || x0 >= p.x1) && Math.abs(cy - p.cy) < (B.h + p.h) / 2 + vGap);
+    return clash ? null : { x0, x1: x0 + pw, cy, h: B.h };
+  };
+  visible
+    .slice()
+    .sort((a, b) => a.anchor.y - b.anchor.y)
+    .forEach(it => {
+      let slot = null;
+      for (let k = 0; k < 600 && !slot; k++) {
+        const off = (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 2;
+        slot = tryAt(it, it.box.cy + off);
       }
+      if (slot) it.box = slot;
+      placed.push(it.box);
+    });
+
+  // ---- 4. write to DOM (light smoothing so re-ordering doesn't jump) ----
+  // Time-based (not per-frame) easing so slow devices don't lag behind.
+  const now = performance.now();
+  const dt = _lastLabelT ? Math.min(200, now - _lastLabelT) : 16;
+  _lastLabelT = now;
+  const k = snap ? 1 : 1 - Math.exp(-dt / 45);
+  items.forEach(it => {
+    const d = it.d;
+    const path = pathEls[d.id], dot = dotEls[d.id];
+    if (it.hidden) {
+      d.wrap.style.display = 'none';
+      if (path) path.setAttribute('d', '');
+      if (dot) dot.style.display = 'none';
+      d.cur = null;
+      return;
     }
-    const path = pathEls[a.id];
-    const dot = dotEls[a.id];
-    if (path) {
-      // Small vertical elbow before the horizontal run makes the line easier to
-      // trace back to its pill when many labels are stacked closely.
-      path.setAttribute('d', a.behind ? '' : `M ${a.x},${a.y} L ${bendX},${a.y} L ${bendX},${a.labelY}`);
+    const B = it.box;
+    if (!d.cur || snap) d.cur = { x0: B.x0, cy: B.cy };
+    else {
+      d.cur.x0 += (B.x0 - d.cur.x0) * k;
+      d.cur.cy += (B.cy - d.cur.cy) * k;
     }
+    const pw = B.x1 - B.x0;
+    d.wrap.style.display = 'flex';
+    d.wrap.style.left = d.cur.x0 + 'px';
+    d.wrap.style.right = 'auto';
+    d.wrap.style.top = d.cur.cy + 'px';
+    d.wrap.classList.toggle('side-left', it.side === 'left');
+    d.wrap.classList.toggle('side-right', it.side === 'right');
+
+    // Leader: anchor → short horizontal tail into the near edge of the pill
+    const ax = it.anchor.x, ay = it.anchor.y;
+    const ex = it.side === 'left' ? d.cur.x0 + pw : d.cur.x0;
+    const tail = it.side === 'left' ? 10 : -10;
+    if (path) path.setAttribute('d', `M ${ax},${ay} L ${ex + tail},${d.cur.cy} L ${ex},${d.cur.cy}`);
     if (dot) {
-      dot.setAttribute('cx', a.x);
-      dot.setAttribute('cy', a.y);
-      dot.style.display = a.behind ? 'none' : 'block';
+      dot.setAttribute('cx', ax);
+      dot.setAttribute('cy', ay);
+      dot.style.display = 'block';
     }
   });
-}
-
-function getLabelPillHeight() {
-  // Measure the ACTUAL rendered height of a label pill (font-size/padding are
-  // fixed in CSS, so any existing pill is representative). Falls back to a
-  // generous estimate if nothing is in the DOM yet.
-  const sample = labelsRoot && labelsRoot.querySelector('.pkg-label');
-  const h = sample ? sample.getBoundingClientRect().height : 0;
-  return h > 0 ? h : 26;
-}
-
-function distributeLabelY(list, height) {
-  if (!list.length) return;
-  // Gap = full pill height + fixed breathing room, so pills never touch or
-  // overlap even when many anchors land at nearly the same screen Y (common
-  // for stacked package layers). No compression is ever applied afterwards —
-  // if everything doesn't fit within the margins, the whole stack is allowed
-  // to spill upward past the top margin rather than squeezing labels together.
-  const minGap = getLabelPillHeight() + 14;
-  const margin = 18;
-
-  list[0].labelY = Math.min(Math.max(list[0].y, margin), height - margin);
-  for (let i = 1; i < list.length; i++) {
-    const natural = Math.min(Math.max(list[i].y, margin), height - margin);
-    list[i].labelY = Math.max(natural, list[i - 1].labelY + minGap);
-  }
-
-  // If the stack overflows past the bottom margin, shift the WHOLE stack up
-  // (allowed to go above the top margin — "push up" is fine per design intent).
-  const bottomOverflow = list[list.length - 1].labelY - (height - margin);
-  if (bottomOverflow > 0) {
-    list.forEach(a => { a.labelY -= bottomOverflow; });
-  }
 }
 
 function updateLabelActiveStates() {
