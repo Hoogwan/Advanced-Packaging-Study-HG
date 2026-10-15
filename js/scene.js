@@ -41,12 +41,19 @@ const CATEGORY_MATERIAL = {
   'Board':                { metalness: 0.02, roughness: 0.75 },
   'Encapsulant':         { metalness: 0.04, roughness: 0.58 },
   'Memory':              { metalness: 0.10, roughness: 0.38, clearcoat: 0.2, clearcoatRoughness: 0.2 },
-  'Adhesive':            { metalness: 0.0,  roughness: 0.85 }
+  'Adhesive':            { metalness: 0.0,  roughness: 0.85 },
+  'Photonics':           { metalness: 0.10, roughness: 0.25, clearcoat: 0.45, clearcoatRoughness: 0.12 },
+  'Optical':             { metalness: 0.05, roughness: 0.30, clearcoat: 0.5,  clearcoatRoughness: 0.1 },
+  'Light Source':        { metalness: 0.35, roughness: 0.35 },
+  'Cooling':             { metalness: 0.10, roughness: 0.30, clearcoat: 0.4,  clearcoatRoughness: 0.1 },
+  'Power':               { metalness: 0.25, roughness: 0.45 },
+  'Passive':             { metalness: 0.30, roughness: 0.40 },
+  'Diamond':             { metalness: 0.0,  roughness: 0.12, clearcoat: 0.8,  clearcoatRoughness: 0.05 }
 };
 const DEFAULT_MATERIAL = { metalness: 0.15, roughness: 0.55 };
 
 function materialPresetFor(category, pkgId) {
-  if (category === 'Substrate' && pkgId === 'glass') {
+  if (category === 'Glass Core') {
     return { glass: true, metalness: 0.0, roughness: 0.06, transmission: 0.55, thickness: 0.4, ior: 1.5, clearcoat: 0.6, clearcoatRoughness: 0.05 };
   }
   return CATEGORY_MATERIAL[category] || DEFAULT_MATERIAL;
@@ -410,7 +417,10 @@ function buildElement(el, pkg) {
       let idx = 0;
       for (let i=0; i<nx; i++){
         for (let k=0; k<nz; k++){
-          dummy.position.set(-usableX/2 + i*stepX, 0, -usableZ/2 + k*stepZ);
+          const x = -usableX/2 + i*stepX, z = -usableZ/2 + k*stepZ;
+          const skip = opts.skipRect || opts.skipCenter;
+          if (skip && Math.abs(x) < skip.x/2 && Math.abs(z) < skip.z/2) continue;
+          dummy.position.set(x, 0, z);
           dummy.updateMatrix();
           inst.setMatrixAt(idx++, dummy.matrix);
         }
@@ -528,6 +538,72 @@ function buildElement(el, pkg) {
       return mesh;
     }
 
+    case 'boxes': {
+      // Several boxes that form ONE component (e.g. 8 optical engines, 2 HBM
+      // stacks, PCB halves). opts.items: [{ p:[dx,dy,dz], s:[sx,sy,sz]?, rot:[rx,ry,rz]?, color? }]
+      // Each item's size defaults to geo.size; positions are relative to geo.pos.
+      const group = new THREE.Group();
+      group.position.set(px, py, pz);
+      (opts.items || []).forEach(it => {
+        const s = it.s || [sx, sy, sz];
+        const geo = new THREE.BoxGeometry(s[0], s[1], s[2]);
+        const mesh = new THREE.Mesh(geo, makeMat(it.color || el.color, opts, el.category, pkgId));
+        mesh.position.set(it.p[0], it.p[1], it.p[2]);
+        if (it.rot) mesh.rotation.set(it.rot[0], it.rot[1], it.rot[2]);
+        mesh.castShadow = true; mesh.receiveShadow = true;
+        mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 30), new THREE.LineBasicMaterial({
+          color: 0x1a1a17, transparent: true, opacity: 0.22, clippingPlanes: renderer.clippingPlanes
+        })));
+        group.add(mesh);
+      });
+      return group;
+    }
+
+    case 'layered': {
+      // A build-up stack drawn as n thin alternating sub-layers (dielectric /
+      // metal) — reads like a cross-section in a journal figure.
+      const group = new THREE.Group();
+      group.position.set(px, py, pz);
+      const n = opts.n || 6;
+      const h = sy / n;
+      const alt = opts.altColor || '#c99a5b';
+      for (let i = 0; i < n; i++) {
+        const isMetal = i % 2 === 1;
+        const geo = new THREE.BoxGeometry(sx, h * (isMetal ? 0.55 : 1), sz);
+        const mesh = new THREE.Mesh(geo, makeMat(isMetal ? alt : el.color, opts, el.category, pkgId));
+        mesh.position.y = -sy / 2 + h * (i + 0.5);
+        mesh.castShadow = true; mesh.receiveShadow = true;
+        if (i === n - 1 || i === 0) {
+          mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 30), new THREE.LineBasicMaterial({
+            color: 0x1a1a17, transparent: true, opacity: 0.2, clippingPlanes: renderer.clippingPlanes
+          })));
+        }
+        group.add(mesh);
+      }
+      return group;
+    }
+
+    case 'tubes': {
+      // Fibers, light pipes, microfluidic channels. opts.paths: [[[x,y,z],...], ...]
+      // (relative to geo.pos); opts.r = tube radius.
+      const group = new THREE.Group();
+      group.position.set(px, py, pz);
+      const r = opts.r || 0.03;
+      const mat = makeMat(el.color, opts, el.category, pkgId);
+      if (opts.glow) { mat.emissive = new THREE.Color(el.color); mat.emissiveIntensity = 0.45; }
+      (opts.paths || []).forEach(pts => {
+        const v = pts.map(p => new THREE.Vector3(p[0], p[1], p[2]));
+        const curve = v.length === 2
+          ? new THREE.LineCurve3(v[0], v[1])
+          : new THREE.CatmullRomCurve3(v, false, 'centripetal');
+        const geo = new THREE.TubeGeometry(curve, Math.max(8, v.length * 12), r, 10, false);
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.castShadow = true;
+        group.add(mesh);
+      });
+      return group;
+    }
+
     default:
       return null;
   }
@@ -592,10 +668,10 @@ function updateHighlight() {
     const isSel = element.id === selectedId;
     const isHov = element.id === hoveredId;
     if (isSel) {
-      m.emissive = new THREE.Color('#d4a017');
+      m.emissive = new THREE.Color('#c9a227');
       m.emissiveIntensity = 0.45;
     } else if (isHov) {
-      m.emissive = new THREE.Color('#7a2e1f');
+      m.emissive = new THREE.Color('#2f5a43');
       m.emissiveIntensity = 0.2;
     } else {
       if (m.userData.baseColor) {
@@ -624,7 +700,9 @@ function applyExplode() {
   if (!root || !currentPkg) return;
   const layers = Array.from(currentPkg._layers).sort((a,b)=>a-b);
   const midLayer = (layers[0] + layers[layers.length-1]) / 2;
-  const spread = state.explode * 1.4;
+  // Keep the fully exploded stack on screen: tall stacks get a smaller step.
+  const span = Math.max(1, layers[layers.length-1] - layers[0]);
+  const spread = state.explode * Math.min(1.4, 5.5 / span);
   root.children.forEach(obj => {
     const el = obj.userData.element;
     if (!el) return;

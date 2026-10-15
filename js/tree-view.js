@@ -25,7 +25,7 @@
     for (let i = path.length - 1; i >= 0; i--) {
       if (path[i].color) return path[i].color;
     }
-    return '#7a2e1f';
+    return '#2f5a43';
   }
 
   function render() {

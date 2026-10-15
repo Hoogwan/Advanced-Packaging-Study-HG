@@ -6,7 +6,7 @@ window.APPLICATIONS = [
     id: 'ai-hpc',
     name: 'AI / HPC',
     icon: 'fa-microchip',
-    color: '#1F4E79',
+    color: '#3f5a78',
     tagline: 'Compute & memory, fused into one package',
     diagram: {
       from: { label: 'Off-package memory', chips: ['GPU / CPU', 'cm-scale traces', 'DRAM'] },
@@ -18,13 +18,13 @@ window.APPLICATIONS = [
       bottleneck: ['Memory wall (~10nm)', 'Stack thermal resistance', 'Fine-pitch EM risk'],
       roadmap:    ['Higher bandwidth / bit', '48V→1V in-package, 90%η', 'Two-phase liquid cooling']
     },
-    recommendedPackages: ['cowos', 'hybrid', 'hbm']
+    recommendedPackages: ['cowos', 'cpo', 'ai-node']
   },
   {
     id: 'smartphone',
     name: 'Smartphone',
     icon: 'fa-mobile-screen-button',
-    color: '#2E6B33',
+    color: '#4f7a4a',
     tagline: 'More function, same 8mm of space',
     diagram: {
       from: { label: 'This generation', chips: ['Processor', 'RDL', 'PoP memory'] },
@@ -42,7 +42,7 @@ window.APPLICATIONS = [
     id: '5g-6g',
     name: '5G / 6G',
     icon: 'fa-tower-broadcast',
-    color: '#A66B00',
+    color: '#a8782e',
     tagline: 'As frequency climbs, antennas go vertical',
     diagram: {
       from: { label: '3 GHz · 5G low-band', chips: ['λ/2 = 50mm', '2 elements'] },
@@ -60,7 +60,7 @@ window.APPLICATIONS = [
     id: 'aerospace',
     name: 'Aerospace / Harsh',
     icon: 'fa-satellite',
-    color: '#7B3F61',
+    color: '#6a5d7b',
     tagline: 'Commercial tech, flight-qualified',
     diagram: {
       from: { label: 'Commercial HI platform', chips: ['Base building blocks'] },
@@ -72,26 +72,27 @@ window.APPLICATIONS = [
       bottleneck: ['Harsh-environment qualification', 'Long-life material mismatch', 'Sparse yield data'],
       roadmap:    ['Environment test protocols', 'Reliability test vehicles', 'HI readiness roadmap']
     },
-    recommendedPackages: ['chiplet', 'flipchip']
+    recommendedPackages: ['chiplet', 'fowlp']
   }
 ];
 
 // Building-block matrix — level: 'essential' | 'relevant' | 'blank'
 window.APP_MATRIX = {
   columns: [
-    { id: 'ai-hpc',     name: 'AI / HPC',     icon: 'fa-microchip',            color: '#1F4E79' },
-    { id: 'smartphone', name: 'Smartphone',    icon: 'fa-mobile-screen-button', color: '#2E6B33' },
-    { id: '5g-6g',      name: '5G / 6G',       icon: 'fa-tower-broadcast',      color: '#A66B00' },
-    { id: 'aerospace',  name: 'Aerospace',     icon: 'fa-satellite',           color: '#7B3F61' }
+    { id: 'ai-hpc',     name: 'AI / HPC',     icon: 'fa-microchip',            color: '#3f5a78' },
+    { id: 'smartphone', name: 'Smartphone',    icon: 'fa-mobile-screen-button', color: '#4f7a4a' },
+    { id: '5g-6g',      name: '5G / 6G',       icon: 'fa-tower-broadcast',      color: '#a8782e' },
+    { id: 'aerospace',  name: 'Aerospace',     icon: 'fa-satellite',           color: '#6a5d7b' }
   ],
   rows: [
     { block: '2.5D interposer / bridge', linkedPackages: ['cowos', 'chiplet'], values: { 'ai-hpc':'essential', 'smartphone':'relevant', '5g-6g':'relevant', 'aerospace':'relevant' } },
-    { block: '3D stacking + HBM (TSV)',   linkedPackages: ['hbm', 'hybrid'],   values: { 'ai-hpc':'essential', 'smartphone':'relevant', '5g-6g':'relevant', 'aerospace':'relevant' } },
-    { block: 'Hybrid bonding (<10µm)',    linkedPackages: ['hybrid'],          values: { 'ai-hpc':'essential', 'smartphone':'relevant', '5g-6g':'blank',    'aerospace':'blank' } },
+    { block: '3D stacking + HBM (TSV)',   linkedPackages: ['cowos'],          values: { 'ai-hpc':'essential', 'smartphone':'relevant', '5g-6g':'relevant', 'aerospace':'relevant' } },
+    { block: 'Hybrid bonding (<10µm)',    linkedPackages: ['cowos'],          values: { 'ai-hpc':'essential', 'smartphone':'relevant', '5g-6g':'blank',    'aerospace':'blank' } },
     { block: 'Fan-out / RDL / SiP',       linkedPackages: ['fowlp'],           values: { 'ai-hpc':'relevant',  'smartphone':'essential','5g-6g':'essential','aerospace':'relevant' } },
     { block: 'Antenna-in-package',        linkedPackages: [],                  values: { 'ai-hpc':'blank',     'smartphone':'essential','5g-6g':'essential','aerospace':'relevant' } },
-    { block: 'In-package power (GaN)',    linkedPackages: [],                  values: { 'ai-hpc':'essential', 'smartphone':'essential','5g-6g':'relevant', 'aerospace':'relevant' } },
-    { block: 'Advanced cooling',          linkedPackages: [],                  values: { 'ai-hpc':'essential', 'smartphone':'relevant', '5g-6g':'relevant', 'aerospace':'relevant' } }
+    { block: 'In-package power (GaN)',    linkedPackages: ['ai-node'],              values: { 'ai-hpc':'essential', 'smartphone':'essential','5g-6g':'relevant', 'aerospace':'relevant' } },
+    { block: 'Co-packaged optics',        linkedPackages: ['cpo'],             values: { 'ai-hpc':'essential', 'smartphone':'blank',    '5g-6g':'blank',    'aerospace':'blank' } },
+    { block: 'Advanced cooling',          linkedPackages: ['ai-node'],              values: { 'ai-hpc':'essential', 'smartphone':'relevant', '5g-6g':'relevant', 'aerospace':'relevant' } }
   ],
   legend: { essential: 'Essential', relevant: 'Relevant', blank: 'Minor' }
 };

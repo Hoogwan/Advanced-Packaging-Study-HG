@@ -25,7 +25,7 @@ function renderTabs() {
   PACKAGES.forEach((pkg, i) => {
     const btn = document.createElement('button');
     btn.className = 'tab' + (i === activePkgIdx ? ' active' : '');
-    btn.innerHTML = `<span class="tab-num">${String(i+1).padStart(2,'0')}</span><span>${pkg.short}</span>`;
+    btn.innerHTML = `<span class="tab-num">${String.fromCharCode(97 + i)}</span><span>${pkg.short}</span>`;
     btn.addEventListener('click', () => switchTab(i));
     nav.appendChild(btn);
   });
@@ -38,7 +38,7 @@ function switchTab(i) {
   saveLastPkg(i);
   renderTabs();
   const pkg = PACKAGES[i];
-  document.getElementById('view-title').textContent = pkg.name;
+  setViewTitle(pkg, i);
   document.getElementById('view-subtitle').textContent = pkg.subtitle;
   window.PkgScene.loadPackage(pkg);
   renderLayerPanel(pkg);
@@ -115,8 +115,8 @@ async function renderInfoPanel(el) {
   let notesBody = '';
   try {
     [userPapers, notesBody] = await Promise.all([
-      window.dataStore.listPapers(pkg.id, el.id),
-      window.dataStore.getNotes(pkg.id, el.id)
+      window.dataStore.listPapers(storeKey(pkg, el), el.id),
+      window.dataStore.getNotes(storeKey(pkg, el), el.id)
     ]);
   } catch (e) {
     console.error('[app] failed to load papers/notes', e);
@@ -163,7 +163,7 @@ async function renderInfoPanel(el) {
         clearTimeout(saveTimer);
         saveTimer = setTimeout(async () => {
           try {
-            await window.dataStore.setNotes(pkg.id, el.id, notesEl.value);
+            await window.dataStore.setNotes(storeKey(pkg, el), el.id, notesEl.value);
             const t = new Date();
             statusEl.textContent = `Saved · ${t.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
           } catch (e) {
@@ -278,7 +278,7 @@ function togglePaperForm(el) {
     const fd = new FormData(form);
     const pkg = PACKAGES[activePkgIdx];
     try {
-      await window.dataStore.addPaper(pkg.id, el.id, {
+      await window.dataStore.addPaper(storeKey(pkg, el), el.id, {
         title: fd.get('title').trim(),
         url: fd.get('url').trim(),
         notes: fd.get('notes').trim()
@@ -315,6 +315,14 @@ function bindPaperDeleteHandlers(el) {
 }
 
 // ============ HELPERS ============
+// Journal-style figure heading: bold panel letter + structure name.
+function setViewTitle(pkg, i) {
+  document.getElementById('view-title').innerHTML =
+    `<span class="fig-letter">${String.fromCharCode(97 + i)}</span>${escapeHtml(pkg.name)}`;
+}
+// Papers/notes are stored under the package id a component was ORIGINALLY
+// saved with. Components moved into a merged structure carry `legacyPkg`.
+function storeKey(pkg, el) { return el.legacyPkg || pkg.id; }
 function escapeHtml(s) {
   if (s == null) return '';
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
@@ -349,7 +357,7 @@ function bindControls() {
 }
 
 // ============ TOP-LEVEL VIEW SWITCHING ============
-const VIEWS = ['overview', 'explorer', 'applications', 'structure', 'sketchboard'];
+const VIEWS = ['overview', 'explorer', 'applications', 'structure', 'ideas'];
 const LASTVIEW_KEY = 'advPkg.lastView';
 let activeView = 'overview';
 let explorerScenePrimed = false; // Three.js scene is only init'd once, lazily, on first explorer visit
@@ -372,10 +380,6 @@ function switchView(viewName, opts) {
     ensureExplorerReady();
     // Canvas was possibly hidden (display:none) while resizing/measuring — fix size now.
     requestAnimationFrame(() => { if (window.PkgScene) window.PkgScene.resize(); });
-  }
-  if (viewName === 'sketchboard') {
-    // Canvas was possibly hidden (display:none) while resizing/measuring — fix size now.
-    requestAnimationFrame(() => { if (window.SketchboardView) window.SketchboardView.resize(); });
   }
   if (!opts.silent) window.scrollTo(0, 0);
 }
@@ -408,7 +412,7 @@ function ensureExplorerReady() {
   bindControls();
 
   const pkg = PACKAGES[activePkgIdx];
-  document.getElementById('view-title').textContent = pkg.name;
+  setViewTitle(pkg, activePkgIdx);
   document.getElementById('view-subtitle').textContent = pkg.subtitle;
   window.PkgScene.loadPackage(pkg);
   renderLayerPanel(pkg);
@@ -429,6 +433,8 @@ function ensureExplorerReady() {
 // Jump into the 3D Explorer at a specific package (and optionally a specific
 // element within it), from the Applications or Structure Map views.
 function goToPackage(packageId, elementId) {
+  const aliases = window.PACKAGE_ALIASES || {};
+  if (aliases[packageId]) packageId = aliases[packageId];
   const idx = PACKAGES.findIndex(p => p.id === packageId);
   if (idx === -1) { console.warn('[app] goToPackage: unknown packageId', packageId); return; }
 
