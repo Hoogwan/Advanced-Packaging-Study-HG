@@ -13,7 +13,7 @@
   - **디자인 원칙**: 모든 텍스트는 짧은 문구/칩 형태로 압축, Font Awesome 아이콘을 전면에 사용, 출처/논문 인용 텍스트는 사이트 어디에도 표시하지 않음
   - **공개 읽기**: 누구나 접속해 모든 콘텐츠(5개 뷰 전체)를 볼 수 있음
   - **오너 전용 편집**: 로그인한 오너만 논문 추가/삭제, 노트 작성, 스케치보드에 그리기 가능 (Supabase RLS로 서버단 강제)
-  - **헤더/브랜딩**: 사이트 이름 **Purpose-Built** — "From die to package · Hoogwan Lee". Application이 시스템(패키지)을 결정한다는 관점. Nature 학술지 그림 스타일 + 자연 색감(숲·흙·호수 톤)
+  - **헤더/브랜딩**: 사이트 이름 **Hoogwan's Lab Notebook** (연구노트) — "Advanced Packaging · from die to package". Application이 시스템(패키지)을 결정한다는 관점. Nature 학술지 그림 스타일 + 자연 색감(숲·흙·호수 톤)
   - **3D Explorer 프리미엄 리디자인**: `MeshPhysicalMaterial` 기반 재질별(실리콘/금속/유기기판/유리/범프/TSV 등) 재질감 차별화, 스튜디오 조명(Hemisphere+Ambient+key/fill/rim) + ACES 톤매핑 + 비네트 텍스처로 입체감 강화, 카메라를 더 타이트하게 당겨(orthographic d=4.6) 오브젝트 존재감 확대, 각 3D 컴포넌트에서 점선 리더라인으로 뻗어나가는 이름표(라벨)를 추가 — 라벨을 클릭해도 오른쪽 정보 패널이 그대로 열림
 
 ## 화면 구성 (상단 네비게이션)

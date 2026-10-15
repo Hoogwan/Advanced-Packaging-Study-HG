@@ -37,7 +37,7 @@
 
     root.innerHTML = `
       <section class="ov-hero">
-        <div class="ov-eyebrow">Purpose-Built · Hoogwan Lee</div>
+        <div class="ov-eyebrow">Hoogwan's Lab Notebook · Advanced Packaging</div>
         <h1 class="ov-title">The application sets the demand.<br>The <span class="ov-title-accent">system</span> answers it — from die to package.</h1>
         <p class="ov-lede">A die is designed for what it computes. How it is connected, stacked, powered, cooled and linked to the outside world is decided at the package — and that choice follows the application. This atlas traces that chain.</p>
         <div class="ov-stat-row">
