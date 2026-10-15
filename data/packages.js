@@ -66,8 +66,15 @@
      a · FLIP-CHIP & FAN-OUT — the two baseline packages, side by side
      ================================================================= */
   const S = 0.62, BOTTOM = -1.8;
+  // Seat the lid on the die (thin TIM gap) and stand the adhesive ring on the
+  // substrate under the lid edge — the original data had both floating.
+  const FC_FIX = {
+    'fc-lid': g => { g.pos[1] = -0.545; },
+    'fc-adhesive': g => { g.size[1] = 0.53; g.pos[1] = -0.935; }
+  };
   const fc = id => {
     const e = take('flipchip', id);
+    if (FC_FIX[id]) FC_FIX[id](e.geo);
     e.geo = placeGeo(e.geo, S, -2.55, -1.8, BOTTOM);
     return e;
   };
@@ -110,7 +117,7 @@
     short: '2.5D + 3D',
     subtitle: 'One silicon interposer, two directions of scaling. Left to right: a hybrid-bonded 3D stack (SoIC / Foveros-class), a GPU die, an HBM stack, and a second HBM stack opened to show its TSVs and inter-die µbumps. A notional composite, not a specific product.',
     elements: [
-      take('cowos', 'cowos-pcb', { color: C.board, geo: box([9.5, 0.2, 7], [0, -2.2, 0], 0) }),
+      take('cowos', 'cowos-pcb', { color: C.board, geo: box([9.5, 0.2, 7], [0, -2.03, 0], 0) }),
       take('cowos', 'cowos-bga', { color: C.solder, geo: { type: 'ballGrid', size: [8, 0.35, 5.8], pos: [0, -1.75, 0], layer: 1, opts: { nx: 16, nz: 12, r: 0.18 } } }),
       take('cowos', 'cowos-substrate', { color: C.substrate, geo: box([8, 0.35, 5.8], [0, -1.4, 0], 2) }),
       take('cowos', 'cowos-c4', { color: C.solder, geo: { type: 'ballGrid', size: [6.6, 0.12, 3.8], pos: [0, -1.14, 0], layer: 3, opts: { nx: 26, nz: 15, r: 0.06 } } }),
@@ -149,6 +156,14 @@
   const bridgeTone = { 'ch-substrate': C.substrate, 'ch-bridge': C.interposer, 'ch-c4': C.solder, 'ch-ubump': C.ubump, 'ch-die1': C.die, 'ch-die2': C.die2 };
   const bridge = Object.assign({}, JSON.parse(JSON.stringify(bridgeSrc)), { short: 'Bridge · EMIB / UCIe' });
   bridge.elements.forEach(e => { if (bridgeTone[e.id]) e.color = bridgeTone[e.id]; });
+  // Embed the bridge in the substrate cavity (top flush with the substrate)
+  // and seat bumps and chiplets on it — the original data left small gaps.
+  const BR_Y = { 'ch-bridge': -1.365, 'ch-c4': -1.275, 'ch-ubump': -1.305, 'ch-die1': -1.075, 'ch-die2': -1.075 };
+  bridge.elements.forEach(e => { if (BR_Y[e.id] != null) e.geo.pos[1] = BR_Y[e.id]; });
+  bridge.elements.forEach(e => {
+    if (e.id === 'ch-c4') e.geo.size[1] = 0.1;
+    if (e.id === 'ch-ubump') { e.geo.pos[1] = -1.275; Object.assign(e.geo.opts, { nx: 14, nz: 26, r: 0.045 }); }
+  });
 
   /* =================================================================
      d · CO-PACKAGED OPTICS — switch ASIC ringed by optical engines
