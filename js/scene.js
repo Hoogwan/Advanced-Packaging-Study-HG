@@ -75,7 +75,7 @@ function init(canvasEl, callbacks) {
   if ('outputColorSpace' in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
   else if ('outputEncoding' in renderer) renderer.outputEncoding = THREE.sRGBEncoding;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.08;
+  renderer.toneMappingExposure = 1.0;
 
   scene = new THREE.Scene();
 
@@ -88,34 +88,34 @@ function init(canvasEl, callbacks) {
 
   // ============ STUDIO-STYLE LIGHTING ============
   // Soft sky/ground bounce (fills shadows softly, avoids flat/dark look)
-  const hemi = new THREE.HemisphereLight(0xf6f5f1, 0xd9d4c8, 0.55);
+  const hemi = new THREE.HemisphereLight(0xffffff, 0xe4e2dc, 0.85);
   scene.add(hemi);
   // Gentle ambient to lift blacks (subtle AO-like fill)
-  const ambient = new THREE.AmbientLight(0xffffff, 0.28);
+  const ambient = new THREE.AmbientLight(0xffffff, 0.32);
   scene.add(ambient);
   // Key light: large soft shadows
-  const key = new THREE.DirectionalLight(0xfff8ee, 1.35);
+  const key = new THREE.DirectionalLight(0xffffff, 1.1);
   key.position.set(7, 13, 9);
   key.castShadow = true;
   key.shadow.mapSize.set(2048, 2048);
   key.shadow.camera.left = -9; key.shadow.camera.right = 9;
   key.shadow.camera.top = 9; key.shadow.camera.bottom = -9;
   key.shadow.camera.near = 1; key.shadow.camera.far = 30;
-  key.shadow.radius = 5;
+  key.shadow.radius = 9;
   key.shadow.bias = -0.0006;
   scene.add(key);
   // Fill light: cool, opposite side, low intensity — softens shadow contrast
-  const fill = new THREE.DirectionalLight(0xdfe8f2, 0.42);
+  const fill = new THREE.DirectionalLight(0xf2f4f7, 0.55);
   fill.position.set(-9, 6, -7);
   scene.add(fill);
   // Rim light: subtle warm backlight for edge definition / "premium" separation
-  const rim = new THREE.DirectionalLight(0xffe9cf, 0.30);
+  const rim = new THREE.DirectionalLight(0xffffff, 0.18);
   rim.position.set(-4, 4, -10);
   scene.add(rim);
 
   // Soft studio floor: faint shadow-catcher + radial vignette falloff (canvas texture)
   const groundGeo = new THREE.PlaneGeometry(30, 30);
-  const groundMat = new THREE.ShadowMaterial({ opacity: 0.16 });
+  const groundMat = new THREE.ShadowMaterial({ opacity: 0.09 });
   const ground = new THREE.Mesh(groundGeo, groundMat);
   ground.rotation.x = -Math.PI/2;
   ground.position.y = -2.1;
@@ -128,7 +128,7 @@ function init(canvasEl, callbacks) {
   const vignette = new THREE.Mesh(vignetteGeo, vignetteMat);
   vignette.rotation.x = -Math.PI/2;
   vignette.position.y = -2.11;
-  scene.add(vignette);
+  // (vignette removed — a clean white field reads like a journal figure)
 
   // Controls
   controls = new THREE.OrbitControls(camera, renderer.domElement);
@@ -224,10 +224,28 @@ function loadPackage(pkg) {
     }
   });
 
+  journalFinish(root);
   applyExplode();
   applySection();
   frameCamera('iso');
   rebuildLabels(pkg);
+}
+
+// Journal-figure finish: matte (not glossy) surfaces and fine, crisp outlines.
+function journalFinish(group) {
+  group.traverse(o => {
+    if (o.isLineSegments && o.material) {
+      o.material.color = new THREE.Color(0x1f2328);
+      o.material.opacity = 0.42;
+      return;
+    }
+    const m = o.material;
+    if (!m || Array.isArray(m) || !('roughness' in m)) return;
+    const metal = m.metalness > 0.5;
+    m.roughness = Math.max(m.roughness, metal ? 0.32 : 0.5);
+    if ('clearcoat' in m) m.clearcoat = (m.clearcoat || 0) * 0.25;
+    m.needsUpdate = true;
+  });
 }
 
 function registerClickables(obj, el) {

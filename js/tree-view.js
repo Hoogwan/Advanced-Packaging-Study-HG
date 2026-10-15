@@ -28,126 +28,123 @@
     return '#2f5a43';
   }
 
+  const letterOf = id => { const i = PACKAGES.findIndex(p => p.id === id); return i >= 0 ? String.fromCharCode(97 + i) : ''; };
+  const countLeaves = n => (n.children && n.children.length) ? n.children.reduce((k, c) => k + countLeaves(c), 0) : 1;
+
   function render() {
     const root = document.getElementById('structure-root');
     if (!root || !TREE) return;
 
     root.innerHTML = `
-      <header class="sv-header">
-        <div class="sv-header-icon"><i class="fa-solid fa-diagram-project"></i></div>
-        <h1 class="sv-title">The field, as one map</h1>
-      </header>
-      <div class="sv-crumbs" id="sv-crumbs"></div>
-      <div class="sv-map" id="sv-map"></div>
+      <section class="pg-lead">
+        <div class="ov-kicker">Structure Map</div>
+        <h1 class="pg-title">The field, as one map.</h1>
+        <p class="pg-lede">Fundamentals, architectures, commercial platforms, key technologies and open challenges — each entry links back to the structure where it lives in 3D.</p>
+      </section>
+      <div class="sv-layout">
+        <aside class="sv-index" id="sv-index"></aside>
+        <div class="sv-main">
+          <div class="sv-crumbs" id="sv-crumbs"></div>
+          <div id="sv-map"></div>
+        </div>
+      </div>
     `;
-
+    renderIndex();
     renderCrumbs();
     renderMap();
+  }
+
+  function go(newPath) { path = newPath; selectedLeafId = null; renderIndex(); renderCrumbs(); renderMap(); }
+
+  function renderIndex() {
+    const idx = document.getElementById('sv-index');
+    if (!idx) return;
+    const top = TREE.children || [];
+    const activeTop = path[1] ? path[1].id : null;
+    idx.innerHTML = `
+      <button class="sv-index-item ${!activeTop ? 'active' : ''}" data-top="">
+        <span class="sv-index-n">00</span><span>${escapeHtml(TREE.title)}</span>
+      </button>
+      ${top.map((n, i) => `
+        <button class="sv-index-item ${activeTop === n.id ? 'active' : ''}" data-top="${n.id}">
+          <span class="sv-index-n">${String(i + 1).padStart(2, '0')}</span><span>${escapeHtml(n.title)}</span>
+          <span class="sv-index-c">${countLeaves(n)}</span>
+        </button>`).join('')}
+    `;
+    idx.querySelectorAll('.sv-index-item').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const node = btn.dataset.top ? top.find(n => n.id === btn.dataset.top) : null;
+        go(node ? [TREE, node] : [TREE]);
+      });
+    });
   }
 
   function renderCrumbs() {
     const crumbs = document.getElementById('sv-crumbs');
     if (!crumbs) return;
     crumbs.innerHTML = path.map((n, i) => `
-      <button class="sv-crumb ${i === path.length - 1 ? 'active' : ''}" data-idx="${i}">
-        ${n.icon ? `<i class="fa-solid ${n.icon}"></i>` : ''}${escapeHtml(n.title)}
-      </button>
-      ${i < path.length - 1 ? '<i class="fa-solid fa-chevron-right sv-crumb-sep"></i>' : ''}
+      <button class="sv-crumb ${i === path.length - 1 ? 'active' : ''}" data-idx="${i}">${escapeHtml(n.title)}</button>
+      ${i < path.length - 1 ? '<span class="sv-crumb-sep">/</span>' : ''}
     `).join('');
-
     crumbs.querySelectorAll('.sv-crumb').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const idx = parseInt(btn.dataset.idx, 10);
-        path = path.slice(0, idx + 1);
-        selectedLeafId = null;
-        renderCrumbs();
-        renderMap();
-      });
+      btn.addEventListener('click', () => go(path.slice(0, parseInt(btn.dataset.idx, 10) + 1)));
     });
+  }
+
+  function jumpButton(link) {
+    if (!link) return '';
+    const label = link.elementId ? elName(link.packageId, link.elementId) : pkgName(link.packageId);
+    return `<button class="ov-chip sv-jump" data-pkg="${link.packageId}" data-el="${link.elementId || ''}"><b>${letterOf(link.packageId)}</b>${escapeHtml(label)}</button>`;
   }
 
   function renderMap() {
     const map = document.getElementById('sv-map');
     if (!map) return;
     const hub = path[path.length - 1];
-    const color = currentColor();
     const children = hub.children || [];
 
-    map.style.setProperty('--hub-color', color);
-
-    let html = `
-      <div class="sv-hub-row">
-        <div class="sv-hub-card" style="--hub-color:${color}">
-          <div class="sv-hub-icon"><i class="fa-solid ${hub.icon || 'fa-circle'}"></i></div>
-          <div class="sv-hub-title">${escapeHtml(hub.title)}</div>
-          ${hub.desc ? `<div class="sv-hub-desc">${escapeHtml(hub.desc)}</div>` : ''}
-          ${hub.link ? `<button class="sv-hub-jump" data-pkg="${hub.link.packageId}" data-el="${hub.link.elementId || ''}"><i class="fa-solid fa-cube"></i> View in 3D</button>` : ''}
-        </div>
+    map.innerHTML = `
+      <header class="ov-head sv-hub-head">
+        <h2>${escapeHtml(hub.title)}</h2>
+        ${hub.desc ? `<span class="ov-head-note">${escapeHtml(hub.desc)}</span>` : ''}
+      </header>
+      ${hub.link ? `<div class="sv-hub-link">${jumpButton(hub.link)}</div>` : ''}
+      <div class="sv-list">
+        ${children.map((c, i) => {
+          const hasKids = c.children && c.children.length;
+          const pkgFig = c.link && !c.link.elementId && window.Figure2D
+            ? (() => { const p = PACKAGES.find(x => x.id === c.link.packageId); return p ? `<span class="sv-fig">${window.Figure2D.render(p, { width: 200, height: 72, pad: 4 })}</span>` : ''; })()
+            : '';
+          return `
+            <article class="sv-row ${hasKids ? 'is-branch' : ''}" data-id="${c.id}">
+              <span class="sv-row-n">${String(i + 1).padStart(2, '0')}</span>
+              <div class="sv-row-body">
+                <h3>${hasKids ? `<a href="#" class="ov-link sv-open" data-id="${c.id}">${escapeHtml(c.title)}</a>` : escapeHtml(c.title)}</h3>
+                ${c.desc ? `<p>${escapeHtml(c.desc)}</p>` : ''}
+              </div>
+              <div class="sv-row-side">
+                ${pkgFig}
+                ${hasKids ? `<a href="#" class="sv-more sv-open" data-id="${c.id}">${c.children.length} topics →</a>` : jumpButton(c.link)}
+              </div>
+            </article>`;
+        }).join('')}
+        ${!children.length ? '<p class="sv-empty">End of this branch.</p>' : ''}
       </div>
     `;
 
-    if (children.length) {
-      html += `
-        <div class="sv-connector"></div>
-        <div class="sv-children-grid" style="--n:${Math.min(children.length, 4)}">
-          ${children.map(c => renderChildCard(c, color)).join('')}
-        </div>
-      `;
-    } else if (!hub.link) {
-      html += `<div class="sv-empty-note"><i class="fa-solid fa-circle-info"></i> End of this branch</div>`;
-    }
-
-    map.innerHTML = html;
-
-    map.querySelectorAll('.sv-child-card').forEach(card => {
-      card.addEventListener('click', (e) => {
-        if (e.target.closest('.sv-child-jump')) return;
-        const node = findNode(TREE, card.dataset.id);
-        if (!node) return;
-        if (node.children && node.children.length) {
-          path.push(node);
-          selectedLeafId = null;
-          renderCrumbs();
-          renderMap();
-        } else {
-          selectedLeafId = selectedLeafId === node.id ? null : node.id;
-          renderMap();
-        }
+    map.querySelectorAll('.sv-open').forEach(a => {
+      a.addEventListener('click', e => {
+        e.preventDefault();
+        const node = findNode(TREE, a.dataset.id);
+        if (node) go(path.concat([node]));
       });
     });
-    map.querySelectorAll('.sv-child-jump, .sv-hub-jump').forEach(btn => {
-      btn.addEventListener('click', (e) => {
+    map.querySelectorAll('.sv-jump').forEach(btn => {
+      btn.addEventListener('click', e => {
         e.stopPropagation();
-        const pkg = btn.dataset.pkg;
-        const el = btn.dataset.el;
-        if (window.AppNav && pkg) window.AppNav.goToPackage(pkg, el || undefined);
+        if (window.AppNav) window.AppNav.goToPackage(btn.dataset.pkg, btn.dataset.el || undefined);
       });
     });
-  }
-
-  function renderChildCard(node, parentColor) {
-    const hasChildren = node.children && node.children.length > 0;
-    const hasLink = !!node.link;
-    const isOpen = selectedLeafId === node.id;
-    const color = node.color || parentColor;
-    return `
-      <div class="sv-child-card ${isOpen ? 'open' : ''} ${hasChildren ? 'has-children' : ''}" data-id="${node.id}" style="--card-color:${color}">
-        <div class="sv-child-icon"><i class="fa-solid ${node.icon || 'fa-circle'}"></i></div>
-        <div class="sv-child-title">${escapeHtml(node.title)}</div>
-        ${hasChildren ? `<div class="sv-child-count">${node.children.length}</div>` : ''}
-        ${hasLink && !hasChildren ? '<div class="sv-child-3d-badge"><i class="fa-solid fa-cube"></i></div>' : ''}
-        ${isOpen && !hasChildren ? `
-          <div class="sv-child-detail">
-            ${node.desc ? `<p>${escapeHtml(node.desc)}</p>` : ''}
-            ${hasLink ? `
-              <button class="sv-child-jump" data-pkg="${node.link.packageId}" data-el="${node.link.elementId || ''}">
-                <i class="fa-solid fa-cube"></i> ${escapeHtml(pkgName(node.link.packageId))}${node.link.elementId ? ' · ' + escapeHtml(elName(node.link.packageId, node.link.elementId)) : ''}
-              </button>
-            ` : ''}
-          </div>
-        ` : ''}
-      </div>
-    `;
   }
 
   function findNode(node, id) {
