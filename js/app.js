@@ -79,8 +79,32 @@ function renderLayerPanel(pkg) {
 // ============ INFO PANEL ============
 function renderInfoEmpty() {
   const panel = document.getElementById('info-panel');
+  const pkg = PACKAGES[activePkgIdx];
   panel.classList.add('empty');
-  panel.innerHTML = `<div class="info-empty">Click any component in the 3D view to see its technology overview, materials, process, challenges, and related papers.</div>`;
+  if (!pkg) { panel.innerHTML = ''; return; }
+  const letter = String.fromCharCode(97 + activePkgIdx);
+  panel.innerHTML = `
+    <div class="info-header">
+      <div class="eyebrow">Structure ${letter} · ${pkg.elements.length} components</div>
+      <h2>${escapeHtml(pkg.name)}</h2>
+    </div>
+    <p class="overview-text info-lede">${escapeHtml(pkg.subtitle)}</p>
+    <section class="info-section">
+      <div class="section-title">Components</div>
+      <ol class="info-index">
+        ${pkg.elements.map(el => `
+          <li><button data-eid="${el.id}"><span class="info-index-sw" style="background:${el.color}"></span><span class="info-index-name">${escapeHtml(el.name)}</span><span class="info-index-cat">${escapeHtml(el.category)}</span></button></li>
+        `).join('')}
+      </ol>
+      <p class="info-hint">Select a component here or in the 3D view.</p>
+    </section>
+  `;
+  panel.querySelectorAll('.info-index button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const el = pkg.elements.find(e => e.id === btn.dataset.eid);
+      if (el) selectElement(el);
+    });
+  });
 }
 
 function selectElement(el) {
@@ -108,6 +132,12 @@ async function renderInfoPanel(el) {
     </section>
   `;
   panel.scrollTop = 0;
+  const back = document.getElementById('info-back');
+  if (back) back.addEventListener('click', () => {
+    activeElementId = null; currentEl = null;
+    window.PkgScene.selectElement(null);
+    renderInfoEmpty();
+  });
 
   const isOwner = window.auth && window.auth.isOwner();
 
@@ -125,13 +155,13 @@ async function renderInfoPanel(el) {
   // Guard against tab/selection switch while awaiting
   if (currentEl !== el) return;
 
-  const allPapers = [
-    ...(c.papers || []).map(p => ({...p, _baseline:true})),
-    ...userPapers.map(p => ({...p, _baseline:false}))
-  ];
+  // Baseline papers from the original content are hidden until verified;
+  // only papers the owner has added (stored in Supabase) are listed.
+  const allPapers = userPapers.map(p => ({...p, _baseline:false}));
 
   const papersSection = document.getElementById('papers-section');
-  if (papersSection) {
+  if (papersSection && !allPapers.length && !isOwner) papersSection.remove();
+  else if (papersSection) {
     papersSection.innerHTML = `
       <div class="section-title">Related Papers <span style="color:var(--ink-soft); font-weight:normal; margin-left:6px;">(${allPapers.length})</span></div>
       <div class="paper-list" id="paper-list">
@@ -173,11 +203,10 @@ async function renderInfoPanel(el) {
         }, 400);
       });
     } else {
-      notesSection.innerHTML = `
+      if (!notesBody) notesSection.remove();
+      else notesSection.innerHTML = `
         <div class="section-title">My Notes</div>
-        ${notesBody
-          ? `<pre class="notes-readonly">${escapeHtml(notesBody)}</pre>`
-          : `<div class="notes-readonly-empty">No notes yet.</div>`}
+        <pre class="notes-readonly">${escapeHtml(notesBody)}</pre>
       `;
     }
   }
@@ -185,10 +214,10 @@ async function renderInfoPanel(el) {
 
 function renderStaticSections(pkg, el, c) {
   return `
+    <button class="info-back" id="info-back">← ${escapeHtml(pkg.short)} · all components</button>
     <div class="info-header">
-      <div class="eyebrow">${pkg.name} · Component</div>
-      <h2>${el.name}</h2>
-      <span class="category-tag">${el.category}</span>
+      <div class="eyebrow">${escapeHtml(pkg.name)} · ${escapeHtml(el.category)}</div>
+      <h2>${escapeHtml(el.name)}</h2>
     </div>
 
     ${c.overview ? `

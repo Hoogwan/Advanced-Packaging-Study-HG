@@ -377,7 +377,105 @@
     ]
   };
 
-  window.PACKAGES = [baseline, integ, bridge, cpo, aiNode];
+  /* =================================================================
+     f · IDEA — GPU–HBM processing units on a glass interposer
+         (Hoogwan Lee's concept sketch)
+     ================================================================= */
+  const IDEA = "Concept by Hoogwan Lee — drawn from his own sketch, not a published design.";
+  const stackItems = (xs, w, d, dieH, n, gap) => {
+    const items = [];
+    xs.forEach(x => { for (let i = 0; i < n; i++) items.push({ p: [x, -((n - 1) / 2) * (dieH + gap) + i * (dieH + gap), 0], s: [w, dieH, d] }); });
+    return items;
+  };
+  const HBM_G1 = [-2.5, -1.95, -1.4, -0.85, -0.3];
+  const HBM_G2 = [1.0, 1.55, 2.1, 2.65, 3.2, 3.75];
+  const HBF_X = [0.35, 4.4];
+  const mids = xs => xs.slice(1).map((x, i) => (x + xs[i]) / 2);
+  // power: main columns in the wide gaps + a pair of pillars in every gap between HBM stacks
+  const PWR = [
+    ...[0.0, 0.7, 4.07].flatMap(x => [-1.1, 0, 1.1].map(z => [x, z])),
+    ...[...mids(HBM_G1), ...mids(HBM_G2)].flatMap(x => [-0.5, 0.5].map(z => [x, z]))
+  ];
+  const coolLoop = (cx) => [[cx - 1.1, 0.1, -1.0], [cx + 1.1, 0.1, -1.0], [cx + 1.1, 0.1, 0], [cx - 1.1, 0.1, 0], [cx - 1.1, 0.1, 1.0], [cx + 1.1, 0.1, 1.0]];
+  const idea = {
+    id: 'idea-pu',
+    name: 'GPU–HBM Units on Glass',
+    short: 'Idea · PU on Glass',
+    subtitle: 'My concept: each GPU sits directly on a row of HBM stacks, so GPU + memory act as one processing unit (PU). The layer between GPU and memory is a glass interposer with silicon photonics — the two PUs talk over light instead of a silicon bridge. Power rises through the glass and between the memory stacks. A concept sketch, not a published design.',
+    elements: [
+      { id: 'idea-bga', name: 'Solder Balls', category: 'Interconnect', color: C.solder,
+        geo: { type: 'ballGrid', size: [8.6, 0.3, 5.0], pos: [1.0, -2.15, 0], layer: 0, opts: { nx: 14, nz: 8, r: 0.14 } },
+        content: content('Second-level interconnect from the glass interposer to the board. ' + IDEA, { keywords: ['BGA', 'Second-level interconnect'] }) },
+      { id: 'idea-glass', name: 'Base Glass Interposer', category: 'Glass Core', color: C.glass,
+        geo: box([8.6, 0.45, 5.0], [1.0, -1.775, 0], 1, { opacity: 0.45 }),
+        content: content('The base glass interposer carries both processing units. Glass is flat and dimensionally stable over large panels. ' + IDEA, {
+          keywords: ['Glass interposer', 'Large panel', 'Low CTE'],
+          challenges: [{ name: 'Heat does not leave downward', desc: 'Glass conducts heat poorly (on the order of 1 W/m·K, versus roughly 150 W/m·K for silicon), so the memory sitting on it relies on other cooling paths.' }]
+        }) },
+      { id: 'idea-tgv', name: 'Through-Glass Vias (TGV)', category: 'Vertical Interconnect', color: C.copper,
+        geo: { type: 'tsvArray', size: [8.6, 0.45, 5.0], pos: [1.0, -1.775, 0], layer: 1, opts: { nx: 14, nz: 6, r: 0.035, h: 0.45 } },
+        content: content('Copper-filled vias through the base glass carrying power and signals vertically. ' + IDEA, { keywords: ['TGV', 'Vertical interconnect'] }) },
+      { id: 'idea-power', name: 'Vertical Power Paths', category: 'Power', color: C.laser,
+        geo: { type: 'tubes', size: [5, 1.5, 3], pos: [0, 0, 0], layer: 2, opts: { r: 0.034, glow: true,
+          paths: PWR.map(([x, z]) => [[x, -2.0, z], [x, -0.66, z]]) } },
+        content: content('Power is fed from below, up through the glass and through every gap between memory stacks, into the GPUs above — the red "Power" arrows in the sketch. Spreading the pillars across all the gaps shortens the lateral path to each part of the GPU. ' + IDEA, {
+          keywords: ['Vertical power delivery', 'Power pillars between stacks'],
+          challenges: [{ name: 'Current through the memory layer', desc: 'GPU current must pass the memory tier; dedicated pillars between stacks avoid routing it through the DRAM dies themselves.' }]
+        }) },
+      { id: 'idea-hbm', name: 'HBM Stacks under the GPUs', category: 'Memory', color: C.memory,
+        geo: { type: 'boxes', size: [0.42, 0.1, 1.6], pos: [0, -1.1, 0], layer: 2, opts: { items: stackItems([...HBM_G1, ...HBM_G2], 0.42, 1.6, 0.1, 8, 0.012) } },
+        content: content('Rows of HBM stacks placed directly beneath each GPU instead of beside it. The GPU-to-memory path becomes a short vertical hop, and the hot GPU stays on top next to the cooling. ' + IDEA, {
+          keywords: ['Memory-under-logic', 'Vertical GPU–memory link', 'One processing unit'],
+          challenges: [{ name: 'Memory temperature', desc: 'Sandwiched between the GPU and the glass, the HBM has no direct cooling path; DRAM typically needs more frequent refresh above about 85 °C.' }]
+        }) },
+      { id: 'idea-hbf', name: 'HBF in the Memory Row', category: 'Memory', color: '#8a6fb0',
+        geo: { type: 'boxes', size: [0.5, 0.1, 1.6], pos: [0, -1.1, 0], layer: 2, opts: { items: stackItems(HBF_X, 0.5, 1.6, 0.1, 8, 0.012) } },
+        content: content('High-bandwidth flash (HBF) — stacked NAND flash with an HBM-like wide interface — placed in the memory row as a high-capacity tier close to the GPUs. ' + IDEA, {
+          keywords: ['HBF', 'High-bandwidth flash', 'Capacity tier'],
+          challenges: [{ name: 'Heat and retention', desc: 'NAND flash retains data less well at high temperature, so flash next to a GPU needs careful thermal design.' },
+                       { name: 'Endurance', desc: 'Flash tolerates limited write cycles, so it suits read-heavy data such as model weights.' }]
+        }) },
+      { id: 'idea-carrier', name: 'Photonic Glass Interposer', category: 'Glass Core', color: C.glass,
+        geo: box([7.6, 0.18, 2.6], [1.0, -0.565, 0], 3, { opacity: 0.5 }),
+        content: content('The layer between the GPUs and the memory is also glass — and it carries light. Glass is transparent at telecom wavelengths, so optical waveguides and photonic engines can live inside this interposer and link the two processing units optically. ' + IDEA, {
+          keywords: ['Glass interposer', 'Silicon photonics', 'Optical interconnect'],
+          challenges: [{ name: 'Electrical + optical in one layer', desc: 'The same interposer must route dense GPU–memory wiring and keep low-loss optical paths.' }]
+        }) },
+      { id: 'idea-electronic', name: 'Electronic Routing (GPU ↔ HBM)', category: 'RDL', color: '#d9893a',
+        geo: { type: 'boxes', size: [2.5, 0.05, 2.2], pos: [0, -0.45, 0], layer: 3, opts: { items: [{ p: [-1.3, 0, 0] }, { p: [2.6, 0, 0] }] } },
+        content: content('Fine electrical wiring on the glass connecting each GPU to the memory stacks directly below it ("electronic" in the sketch). GPU–memory stays electrical; GPU–GPU goes optical. ' + IDEA, {
+          keywords: ['RDL', 'GPU–memory wiring'] }) },
+      { id: 'idea-photonic', name: 'Photonic Engines (PIC)', category: 'Photonics', color: C.photonics,
+        geo: { type: 'boxes', size: [0.45, 0.12, 1.4], pos: [0, -0.565, 0], layer: 3, opts: { items: [{ p: [-0.25, 0, 0] }, { p: [1.6, 0, 0] }, { p: [4.45, 0, 0], s: [0.6, 0.12, 1.6] }] } },
+        content: content('Silicon photonic engines inside the glass interposer: one at the inner edge of each GPU for the PU-to-PU optical link, and one at the package edge for off-package I/O ("photonic 연결" in the sketch). ' + IDEA, {
+          keywords: ['Silicon photonics', 'PIC', 'Optical I/O'],
+          challenges: [{ name: 'Heat next to the GPU', desc: 'Photonic devices such as micro-rings drift with temperature and need tuning — hard right beside a hot GPU.' }]
+        }) },
+      { id: 'idea-waveguide', name: 'Optical Link PU ↔ PU (waveguides)', category: 'Optical', color: '#5fb3ad',
+        geo: { type: 'tubes', size: [1.6, 0.1, 1], pos: [0, 0, 0], layer: 3, opts: { r: 0.03, glow: true,
+          paths: [-0.45, 0, 0.45].map(z => [[-0.02, -0.565, z], [1.37, -0.565, z]]) } },
+        content: content('Waveguides in the glass interposer carry light between the two photonic engines, so PU 1 and PU 2 communicate optically instead of through a silicon bridge. (An alternative is to keep this link electrical with a silicon bridge.) ' + IDEA, {
+          keywords: ['Optical waveguide', 'Chip-to-chip optical link', 'Alternative: Si bridge'] }) },
+      { id: 'idea-fiber', name: 'Optical Fiber (off-package)', category: 'Optical', color: C.fiber,
+        geo: { type: 'tubes', size: [1.5, 0.4, 1], pos: [0, 0, 0], layer: 3, opts: { r: 0.045, paths: [-0.5, 0, 0.5].map(z => [[4.75, -0.565, z], [5.4, -0.565, z], [6.1, -0.85, z * 1.2]]) } },
+        content: content('Fibers leaving the edge photonic engine. ' + IDEA, { keywords: ['Fiber I/O'] }) },
+      { id: 'idea-gpu', name: 'GPUs (PU 1 · PU 2)', category: 'Active Die', color: C.die,
+        geo: { type: 'boxes', size: [2.5, 0.45, 2.2], pos: [0, -0.2, 0], layer: 4, opts: { items: [{ p: [-1.3, 0, 0] }, { p: [2.6, 0, 0], color: C.die2 }] } },
+        content: content('Two GPUs, each on top of its own memory row. GPU + memory below = one processing unit (PU 1, PU 2), outlined in red in the sketch. ' + IDEA, {
+          keywords: ['GPU', 'Processing unit', 'Logic on top'] }) },
+      { id: 'idea-pu-envelope', name: 'Processing-Unit Envelopes', category: 'Concept', color: C.laser,
+        geo: { type: 'boxes', size: [2.9, 1.65, 2.7], pos: [0, -0.73, 0], layer: 3, opts: { opacity: 0.07, items: [{ p: [-1.3, 0, 0] }, { p: [2.4, 0, 0], s: [3.4, 1.65, 2.7] }] } },
+        content: content('The idea in one picture: each GPU and the memory directly beneath it behave as a single processing unit (PU 1 and PU 2). ' + IDEA, {
+          keywords: ['GPU–HBM unit', 'Near-memory compute'] }) },
+      { id: 'idea-cooling', name: 'Top Cooling Loop', category: 'Cooling', color: C.coolant,
+        geo: { type: 'tubes', size: [6, 0.2, 2.4], pos: [0, 0, 0], layer: 5, opts: { r: 0.07,
+          paths: [coolLoop(-1.3), coolLoop(2.6), [[-0.2, 0.1, 1.0], [1.5, 0.1, 1.0]]] } },
+        content: content('Coolant loops over both GPUs, linked into one circuit (green in the sketch). Keeping the hottest dies on top puts them right against this cooling. ' + IDEA, {
+          keywords: ['Liquid cooling', 'Cold plate', 'Top-side cooling'] }) }
+    ]
+  };
+
+  window.PACKAGES = [baseline, integ, bridge, cpo, aiNode, idea];
 
   // Old structure ids → where their components live now (for saved links).
   window.PACKAGE_ALIASES = { hybrid: 'cowos', hbm: 'cowos', flipchip: 'fowlp', glass: 'ai-node' };

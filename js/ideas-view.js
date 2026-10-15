@@ -7,6 +7,13 @@
     return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
+  // Front view of the related 3D structure (same drawing as the Overview).
+  function figureFor(it) {
+    const id = it.relatesTo && it.relatesTo.packageId;
+    const pkg = (window.PACKAGES || []).find(p => p.id === id);
+    return pkg && window.Figure2D ? window.Figure2D.render(pkg, { width: 480, height: 300, pad: 14 }) : '';
+  }
+
   function render() {
     const root = document.getElementById('ideas-root');
     if (!root) return;
@@ -15,9 +22,9 @@
     const plates = ideas.length
       ? ideas.map((it, i) => `
         <article class="idea-plate">
-          <a class="idea-figure" href="${esc(it.image)}" target="_blank" rel="noopener">
+          ${it.image ? `<a class="idea-figure" href="${esc(it.image)}" target="_blank" rel="noopener">
             <img src="${esc(it.image)}" alt="${esc(it.title)}" loading="lazy">
-          </a>
+          </a>` : `<div class="idea-figure idea-figure-2d">${figureFor(it)}</div>`}
           <div class="idea-caption">
             <div class="idea-fig"><b>Idea ${i + 1}</b>${it.date ? ` · ${esc(it.date)}` : ''}</div>
             <h2 class="idea-title">${esc(it.title)}</h2>
@@ -42,7 +49,7 @@
         <p class="ideas-lede">My own sketches and concepts — each starts from an application’s need and asks what the system should look like.</p>
         ${ideas.length ? '' : '<p class="ideas-empty-note">The first sketches are on their way.</p>'}
       </header>
-      <section class="ideas-grid">${plates}</section>
+      <section class="ideas-grid${ideas.length === 1 ? ' is-single' : ''}">${plates}</section>
     `;
 
     root.querySelectorAll('.idea-link').forEach(btn => {

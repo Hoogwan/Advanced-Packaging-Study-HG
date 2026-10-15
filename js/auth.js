@@ -150,11 +150,20 @@
     form.querySelector('input[name="email"]').focus();
   }
 
+  function adminEntry() {
+    try {
+      if (/admin/.test(location.hash)) { sessionStorage.setItem('showLogin', '1'); return true; }
+      return sessionStorage.getItem('showLogin') === '1';
+    } catch (e) { return /admin/.test(location.hash); }
+  }
+  window.addEventListener('hashchange', () => { if (/admin/.test(location.hash)) renderWidget(); });
+
   function renderWidget() {
     const el = ensureWidget();
     if (!el) return;
     closePopover();
     if (session && session.user) {
+      el.style.display = '';
       el.innerHTML = `
         <span class="auth-email" title="${session.user.email}">${session.user.email}</span>
         <button class="auth-btn" id="auth-logout-btn">Log out</button>
@@ -163,7 +172,13 @@
       el.querySelector('#auth-logout-btn').addEventListener('click', async () => {
         await window.auth.signOut();
       });
+    } else if (!adminEntry()) {
+      // Public view: no login button. The owner opens the site with #admin
+      // (e.g. …vercel.app/#admin) to reveal it.
+      el.innerHTML = '';
+      el.style.display = 'none';
     } else {
+      el.style.display = '';
       el.innerHTML = `<button class="auth-btn" id="auth-login-btn">Log in</button>`;
       el.querySelector('#auth-login-btn').addEventListener('click', (e) => {
         e.stopPropagation();

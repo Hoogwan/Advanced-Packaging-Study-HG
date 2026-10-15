@@ -185,6 +185,7 @@ function onResize() {
   camera.top = d;
   camera.bottom = -d;
   camera.updateProjectionMatrix();
+  fitZoom();
   updateLabelPositions();
 }
 
@@ -782,6 +783,27 @@ function frameCamera(preset) {
   camera.zoom = 1;
   camera.updateProjectionMatrix();
   controls.update();
+  fitZoom();
+}
+
+// Zoom so the whole structure fits the frame (wide structures were cropped).
+function fitZoom() {
+  if (!root) return;
+  root.updateMatrixWorld(true);
+  const box = new THREE.Box3();
+  root.children.forEach(o => { if (o.visible) box.expandByObject(o); });
+  if (box.isEmpty()) return;
+  camera.updateMatrixWorld(true);
+  let m = 0;
+  const v = new THREE.Vector3();
+  for (let i = 0; i < 8; i++) {
+    v.set(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z).project(camera);
+    m = Math.max(m, Math.abs(v.x), Math.abs(v.y));
+  }
+  if (m > 0) {
+    camera.zoom = Math.min(1.5, Math.max(0.4, 0.86 / m));
+    camera.updateProjectionMatrix();
+  }
 }
 
 /* ============ LEADER-LINE LABELS ============

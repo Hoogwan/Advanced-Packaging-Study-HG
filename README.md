@@ -20,7 +20,7 @@
 | 뷰 | 설명 |
 |---|---|
 | Overview | 랜딩 페이지. 아이콘 히어로 + 프레임워크 스텝퍼 + 뷰 안내 카드 |
-| 3D Explorer | 5개 구조 — a. Flip-Chip·Fan-Out, b. 2.5D + 3D(CoWoS + SoIC/Hybrid Bonding + HBM 상세), c. Silicon Bridge(EMIB/UCIe), d. CPO, e. Future AI Server Node(Gupta/Lim 개념도 기반, Glass core 포함). 라벨과 리더라인은 모델을 따라 움직임 |
+| 3D Explorer | 5개 구조 — a. Flip-Chip·Fan-Out, b. 2.5D + 3D(CoWoS + SoIC/Hybrid Bonding + HBM 상세), c. Silicon Bridge(EMIB/UCIe), d. CPO, e. Future AI Server Node(Gupta/Lim 개념도 기반, Glass core 포함), f. 나의 아이디어 — GPU–HBM PU on Glass. 라벨과 리더라인은 모델을 따라 움직임 |
 | Applications | 응용분야 × 패키징 매트릭스 + 4개 도메인별 아이콘 대시보드 |
 | Structure Map | 전체 패키징 기술 지형을 허브-스포크 마인드맵으로 드릴다운 탐색 |
 | Ideas | 나의 아이디어 스케치/컨셉 모음 (`data/ideas.js`) |
@@ -95,3 +95,8 @@ webapp/
 - 반응형 레이아웃은 데스크톱 우선(≥1000px). Overview/Applications/Structure Map/Ideas는 태블릿까지 대응하는 미디어쿼리를 넣었지만 3D Explorer 자체는 모바일 최적화가 부족함
 - Applications 뷰의 4개 도메인은 PPT 원본(AI/HPC, Smartphone, 5G/6G, Aerospace)을 기반으로 하되 텍스트는 짧은 문구로 압축/재구성되었고 일부는 참고 자료를 넘어 확장 작성됨 — 추가 응용분야(예: 자동차, 데이터센터 네트워킹 등)를 원하면 `data/applications.js`에 도메인 객체를 추가하면 됨
 - 커스텀 도메인 연결은 선택 사항 (Vercel에서 설정 가능)
+
+## 운영 메모
+- 공개 화면에는 로그인 버튼이 없음. 오너 로그인은 주소 끝에 `#admin`을 붙여 접속 (예: `https://advanced-packaging-study-hg.vercel.app/#admin`)
+- 원본 콘텐츠의 Related Papers(검증 전)는 화면에서 숨김. 오너가 직접 추가한 논문(Supabase)만 표시
+- 3D 화면은 구조마다 자동으로 화면에 맞게 확대/축소(fitZoom)
