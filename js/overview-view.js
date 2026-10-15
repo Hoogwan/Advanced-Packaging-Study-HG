@@ -19,7 +19,7 @@
     return ch && ch.children ? ch.children.length : 0;
   }
   const letter = i => String.fromCharCode(97 + i);
-  const fig = (pkg, w, h, pad, vExag) => (window.Figure2D ? window.Figure2D.render(pkg, { width: w, height: h, pad, vExag: vExag || 2.2 }) : '');
+  const fig = (pkg, w, h, pad) => (window.Figure2D ? window.Figure2D.render(pkg, { width: w, height: h, pad }) : '');
   // First sentence of a subtitle — enough for a caption.
   const firstSentence = s => { const m = String(s || '').match(/^.*?[.!?](\s|$)/); return m ? m[0].trim() : s; };
 
@@ -50,7 +50,7 @@
           <div class="ov-stage-slides">
             ${PACKAGES.map((p, i) => `
               <figure class="ov-slide${i === 0 ? ' is-active' : ''}" data-i="${i}" aria-hidden="${i === 0 ? 'false' : 'true'}">
-                <div class="ov-slide-fig">${fig(p, 640, 320, 6, 2.6)}</div>
+                <div class="ov-slide-fig">${fig(p, 640, 320, 10)}</div>
                 <figcaption>
                   <span class="ov-slide-letter">${letter(i)}</span>
                   <span class="ov-slide-name">${escapeHtml(p.name)}</span>

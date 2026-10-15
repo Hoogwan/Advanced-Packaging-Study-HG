@@ -4,7 +4,14 @@
 (function () {
   'use strict';
 
-  const OUTLINE = 'rgba(22,25,29,0.38)';
+  // Darken (amt < 0) or lighten (amt > 0) a #rrggbb colour — used for edges.
+  function shade(hex, amt) {
+    const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+    if (!m) return 'rgba(22,25,29,0.4)';
+    const n = parseInt(m[1], 16);
+    const ch = v => Math.round(amt < 0 ? v * (1 + amt) : v + (255 - v) * amt);
+    return '#' + [n >> 16, (n >> 8) & 255, n & 255].map(v => ch(v).toString(16).padStart(2, '0')).join('');
+  }
 
   // Turn one element into simple primitives in model units.
   // rect: {t:'r', x0,x1,y0,y1, c, o}   circle: {t:'c', x,y,r,c}
@@ -109,27 +116,41 @@
       else if (s.t === 'c') { x0 = Math.min(x0, s.x - s.r); x1 = Math.max(x1, s.x + s.r); y0 = Math.min(y0, s.y - s.r); y1 = Math.max(y1, s.y + s.r); }
       else s.pts.forEach(([x, y]) => { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); });
     });
-    // Package cross-sections are wide and thin: exaggerate height for legibility.
-    const vExag = opts.vExag || 1.8;
-    const k = Math.min((W - 2 * pad) / (x1 - x0), (H - 2 * pad) / ((y1 - y0) * vExag));
-    const ox = (W - (x1 - x0) * k) / 2, oy = (H - (y1 - y0) * k * vExag) / 2;
+    // True proportions (no vertical stretch) so solder balls stay round.
+    const k = Math.min((W - 2 * pad) / (x1 - x0), (H - 2 * pad) / (y1 - y0));
+    const ox = (W - (x1 - x0) * k) / 2, oy = (H - (y1 - y0) * k) / 2;
     const X = x => ox + (x - x0) * k;
-    const Y = y => H - (oy + (y - y0) * k * vExag);
-    const sw = Math.max(0.5, Math.min(1, k * 0.012));
+    const Y = y => H - (oy + (y - y0) * k);
+    const f = v => v.toFixed(2);
 
     const parts = all.map(s => {
       if (s.t === 'r') {
-        const x = X(s.x0), y = Y(s.y1), w = Math.max(0.6, (s.x1 - s.x0) * k), h = Math.max(0.6, (s.y1 - s.y0) * k * vExag);
-        const op = s.o != null ? ` fill-opacity="${Math.max(0.18, s.o)}"` : '';
-        const tr = s.rot ? ` transform="rotate(${(-s.rot * 180 / Math.PI).toFixed(1)} ${(x + w / 2).toFixed(1)} ${(y + h / 2).toFixed(1)})"` : '';
-        return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" fill="${s.c}"${op} stroke="${OUTLINE}" stroke-width="${sw}"${tr}/>`;
+        const x = X(s.x0), y = Y(s.y1), w = Math.max(0.5, (s.x1 - s.x0) * k), h = Math.max(0.5, (s.y1 - s.y0) * k);
+        const rx = Math.min(1.6, h / 3, w / 3);
+        const tr = s.rot ? ` transform="rotate(${(-s.rot * 180 / Math.PI).toFixed(1)} ${f(x + w / 2)} ${f(y + h / 2)})"` : '';
+        if (s.o != null && s.o < 0.6) { // translucent encapsulant / spreader: a light veil with a fine dashed edge
+          return `<rect x="${f(x)}" y="${f(y)}" width="${f(w)}" height="${f(h)}" rx="${f(rx)}" fill="${s.c}" fill-opacity="${Math.max(0.12, s.o * 0.6).toFixed(2)}" stroke="${shade(s.c, -0.35)}" stroke-opacity="0.55" stroke-width="0.7" stroke-dasharray="3 2"${tr}/>`;
+        }
+        const op = s.o != null ? ` fill-opacity="${s.o.toFixed(2)}"` : '';
+        const edge = h > 2.2 && w > 2.2 ? ` stroke="${shade(s.c, -0.28)}" stroke-width="0.6"` : '';
+        return `<rect x="${f(x)}" y="${f(y)}" width="${f(w)}" height="${f(h)}" rx="${f(rx)}" fill="${s.c}"${op}${edge}${tr}/>`;
       }
       if (s.t === 'c') {
-        const r = Math.max(0.6, s.r * k);
-        return `<ellipse cx="${X(s.x).toFixed(1)}" cy="${Y(s.y).toFixed(1)}" rx="${r.toFixed(1)}" ry="${(r * vExag).toFixed(1)}" fill="${s.c}" stroke="${OUTLINE}" stroke-width="${sw * 0.8}"/>`;
+        const r = Math.max(0.5, s.r * k), cx = X(s.x), cy = Y(s.y);
+        const hl = r > 2.5 ? `<circle cx="${f(cx - r * 0.32)}" cy="${f(cy - r * 0.34)}" r="${f(r * 0.32)}" fill="#fff" fill-opacity="0.45"/>` : '';
+        return `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}" fill="${s.c}" stroke="${shade(s.c, -0.3)}" stroke-width="${r > 2.5 ? 0.6 : 0}"/>${hl}`;
       }
-      const d = s.pts.map(([x, y], i) => `${i ? 'L' : 'M'}${X(x).toFixed(1)} ${Y(y).toFixed(1)}`).join(' ');
-      return `<path d="${d}" fill="none" stroke="${s.c}" stroke-width="${Math.max(1, s.w * k).toFixed(1)}" stroke-linecap="round" stroke-linejoin="round"/>`;
+      // smooth curve through the points (quadratic through midpoints)
+      const P = s.pts.map(([x, y]) => [X(x), Y(y)]);
+      let d = `M${f(P[0][0])} ${f(P[0][1])}`;
+      if (P.length === 2) d += ` L${f(P[1][0])} ${f(P[1][1])}`;
+      else {
+        for (let i = 1; i < P.length - 1; i++) {
+          const mx = (P[i][0] + P[i + 1][0]) / 2, my = (P[i][1] + P[i + 1][1]) / 2;
+          d += ` Q${f(P[i][0])} ${f(P[i][1])} ${i === P.length - 2 ? f(P[i + 1][0]) + ' ' + f(P[i + 1][1]) : f(mx) + ' ' + f(my)}`;
+        }
+      }
+      return `<path d="${d}" fill="none" stroke="${s.c}" stroke-width="${f(Math.max(1, s.w * k))}" stroke-linecap="round" stroke-linejoin="round"/>`;
     });
 
     return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${(pkg.name || '').replace(/"/g, '')} — front view">${parts.join('')}</svg>`;
