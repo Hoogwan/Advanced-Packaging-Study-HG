@@ -82,7 +82,7 @@
       case 'boxes':
         (o.items || []).forEach(it => {
           const s = it.s || g.size;
-          rect(px + it.p[0], py + it.p[1], s[0], s[1], it.color || c, o.opacity, it.rot ? it.rot[2] : 0);
+          rect(px + it.p[0], py + it.p[1], s[0], s[1], it.color || c, it.opacity != null ? it.opacity : o.opacity, it.rot ? it.rot[2] : 0);
         });
         break;
       case 'tubes':

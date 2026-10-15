@@ -566,7 +566,8 @@ function buildElement(el, pkg) {
       (opts.items || []).forEach(it => {
         const s = it.s || [sx, sy, sz];
         const geo = new THREE.BoxGeometry(s[0], s[1], s[2]);
-        const mesh = new THREE.Mesh(geo, makeMat(it.color || el.color, opts, el.category, pkgId));
+        const itOpts = it.opacity != null ? Object.assign({}, opts, { opacity: it.opacity }) : opts;
+        const mesh = new THREE.Mesh(geo, makeMat(it.color || el.color, itOpts, el.category, pkgId));
         mesh.position.set(it.p[0], it.p[1], it.p[2]);
         if (it.rot) mesh.rotation.set(it.rot[0], it.rot[1], it.rot[2]);
         mesh.castShadow = true; mesh.receiveShadow = true;

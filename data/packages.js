@@ -467,11 +467,32 @@
         geo: { type: 'boxes', size: [2.9, 1.65, 2.7], pos: [0, -0.73, 0], layer: 3, opts: { opacity: 0.07, items: [{ p: [-1.3, 0, 0] }, { p: [2.4, 0, 0], s: [3.4, 1.65, 2.7] }] } },
         content: content('The idea in one picture: each GPU and the memory directly beneath it behave as a single processing unit (PU 1 and PU 2). ' + IDEA, {
           keywords: ['GPU–HBM unit', 'Near-memory compute'] }) },
-      { id: 'idea-cooling', name: 'Top Cooling Loop', category: 'Cooling', color: C.coolant,
-        geo: { type: 'tubes', size: [6, 0.2, 2.4], pos: [0, 0, 0], layer: 5, opts: { r: 0.07,
-          paths: [coolLoop(-1.3), coolLoop(2.6), [[-0.2, 0.1, 1.0], [1.5, 0.1, 1.0]]] } },
-        content: content('Coolant loops over both GPUs, linked into one circuit (green in the sketch). Keeping the hottest dies on top puts them right against this cooling. ' + IDEA, {
-          keywords: ['Liquid cooling', 'Cold plate', 'Top-side cooling'] }) }
+      { id: 'idea-cooling', name: 'Two-Phase Jet-Impingement Cold Plates', category: 'Cooling', color: '#9cc3d5',
+        geo: { type: 'boxes', size: [2.5, 0.22, 2.2], pos: [0, 0, 0], layer: 5, opts: { items: [
+          // cold-plate housings (see-through) over each GPU
+          { p: [-1.3, 0.24, 0], opacity: 0.32 }, { p: [2.6, 0.24, 0], opacity: 0.32 },
+          // nozzle array on the underside of each plate, aimed straight down at the GPU
+          ...[-1.3, 2.6].flatMap(cx => [-0.9, -0.45, 0, 0.45, 0.9].flatMap(dx => [-0.8, -0.4, 0, 0.4, 0.8].map(dz =>
+            ({ p: [cx + dx, 0.09, dz], s: [0.07, 0.09, 0.07], color: C.coolant }))))
+        ] } },
+        content: content('Each GPU is cooled by a cold plate whose underside is an array of nozzles. Coolant jets hit the GPU surface directly (jet impingement), and part of it boils on contact (two-phase), carrying heat away as latent heat. ' + IDEA, {
+          keywords: ['Jet impingement', 'Two-phase cooling', 'Flow boiling', 'Direct-to-die cooling'],
+          materials: [{ name: 'Coolant', desc: 'A low-boiling-point fluid, often a dielectric refrigerant, so it boils near the chip temperature' },
+                      { name: 'Nozzle plate', desc: 'Array of small orifices facing the die' }],
+          challenges: [{ name: 'Critical heat flux', desc: 'Above the critical heat flux the surface dries out under a vapor film and its temperature jumps — the design must keep every hot spot below it.' },
+                       { name: 'Vapor removal', desc: 'Vapor must leave without blocking incoming jets; poor venting causes flow instability and pressure-drop rise.' },
+                       { name: 'Sealing and clogging', desc: 'Small nozzles can clog or erode, and the fluid path must stay sealed for the product lifetime.' }]
+        }) },
+      { id: 'idea-coolant-lines', name: 'Coolant In · Vapor Out', category: 'Cooling', color: C.coolant,
+        geo: { type: 'tubes', size: [7, 0.6, 2], pos: [0, 0, 0], layer: 5, opts: { r: 0.06,
+          paths: [
+            [[-2.9, 0.62, -0.6], [3.9, 0.62, -0.6]],                                    // liquid supply header
+            [[-1.3, 0.62, -0.6], [-1.3, 0.35, -0.6]], [[2.6, 0.62, -0.6], [2.6, 0.35, -0.6]],
+            [[-1.3, 0.35, 0.6], [-1.3, 0.75, 0.6]], [[2.6, 0.35, 0.6], [2.6, 0.75, 0.6]],
+            [[-2.9, 0.75, 0.6], [3.9, 0.75, 0.6]]                                       // two-phase (vapor + liquid) return header
+          ] } },
+        content: content('Liquid coolant enters each plate from the supply header; the two-phase mixture of vapor and remaining liquid leaves through the return header to a condenser. ' + IDEA, {
+          keywords: ['Supply header', 'Two-phase return', 'Condenser loop'] }) }
     ]
   };
 
