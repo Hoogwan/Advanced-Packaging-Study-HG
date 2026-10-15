@@ -100,3 +100,4 @@ webapp/
 - 공개 화면에는 로그인 버튼이 없음. 오너 로그인은 주소 끝에 `#admin`을 붙여 접속 (예: `https://advanced-packaging-study-hg.vercel.app/#admin`)
 - 원본 콘텐츠의 Related Papers(검증 전)는 화면에서 숨김. 오너가 직접 추가한 논문(Supabase)만 표시
 - 3D 화면은 구조마다 자동으로 화면에 맞게 확대/축소(fitZoom)
+- 방문자 통계: Vercel Web Analytics 사용 (Vercel 대시보드 → 프로젝트 → Analytics). 일별 방문자, 페이지, 국가, 기기, 유입 경로 확인. 통계는 대시보드에서만 보이고 사이트에는 표시되지 않음. Hobby 플랜은 월 50,000 이벤트, 보관 1개월
