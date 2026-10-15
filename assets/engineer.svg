@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Cleanroom engineer holding a wafer">
+  <defs>
+    <linearGradient id="eng-wafer" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#d9e6ea"/>
+      <stop offset="0.5" stop-color="#9fbcc6"/>
+      <stop offset="1" stop-color="#c9b8d8"/>
+    </linearGradient>
+    <clipPath id="eng-wafer-clip"><circle cx="32" cy="49" r="10.5"/></clipPath>
+  </defs>
+  <!-- bunny suit body -->
+  <path d="M12.5 64 C12.5 47 19.5 39.5 32 39.5 C44.5 39.5 51.5 47 51.5 64 Z" fill="#f7f6f2" stroke="#232a33" stroke-width="2" stroke-linejoin="round"/>
+  <!-- hood -->
+  <path d="M32 6.5 C42.5 6.5 48 14 48 23.5 C48 33 41.5 40 32 40 C22.5 40 16 33 16 23.5 C16 14 21.5 6.5 32 6.5 Z" fill="#f7f6f2" stroke="#232a33" stroke-width="2"/>
+  <path d="M32 7 V12" stroke="#232a33" stroke-width="1.4" stroke-linecap="round"/>
+  <!-- face opening -->
+  <rect x="21" y="15.5" width="22" height="16" rx="8" fill="#f3d2b6" stroke="#232a33" stroke-width="1.6"/>
+  <!-- eyes -->
+  <ellipse cx="27.3" cy="20.6" rx="1.7" ry="2" fill="#232a33"/>
+  <ellipse cx="36.7" cy="20.6" rx="1.7" ry="2" fill="#232a33"/>
+  <circle cx="27.9" cy="19.9" r="0.6" fill="#fff"/>
+  <circle cx="37.3" cy="19.9" r="0.6" fill="#fff"/>
+  <!-- face mask -->
+  <path d="M21.6 24.2 H42.4 V27 C42.4 29.6 40.3 31.2 37.8 31.2 H26.2 C23.7 31.2 21.6 29.6 21.6 27 Z" fill="#bcd6e0" stroke="#232a33" stroke-width="1.4" stroke-linejoin="round"/>
+  <path d="M25.5 27.4 H38.5" stroke="#232a33" stroke-width="0.9" stroke-linecap="round" opacity="0.45"/>
+  <!-- wafer -->
+  <circle cx="32" cy="49" r="10.5" fill="url(#eng-wafer)" stroke="#232a33" stroke-width="1.8"/>
+  <g clip-path="url(#eng-wafer-clip)" stroke="#ffffff" stroke-width="0.8" opacity="0.85">
+    <path d="M24 38 V60 M28 38 V60 M32 38 V60 M36 38 V60 M40 38 V60"/>
+    <path d="M20 41 H44 M20 45 H44 M20 49 H44 M20 53 H44 M20 57 H44"/>
+  </g>
+  <path d="M30.4 59.4 L32 57.9 L33.6 59.4" fill="none" stroke="#232a33" stroke-width="1.2" stroke-linejoin="round"/>
+  <!-- gloved hands -->
+  <circle cx="21.6" cy="49.5" r="3.4" fill="#bcd6e0" stroke="#232a33" stroke-width="1.6"/>
+  <circle cx="42.4" cy="49.5" r="3.4" fill="#bcd6e0" stroke="#232a33" stroke-width="1.6"/>
+</svg>

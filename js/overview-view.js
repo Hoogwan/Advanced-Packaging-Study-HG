@@ -1,5 +1,5 @@
-// Overview — landing page. Message: the application decides the system,
-// and the package is where die-level design meets system-level needs.
+// Overview — landing page in a journal-front-page mood: a lead story
+// (application → system), then the structures listed like featured articles.
 (function () {
   'use strict';
 
@@ -7,17 +7,23 @@
   const PACKAGES = window.PACKAGES || [];
   const APPS = window.APPLICATIONS || [];
 
-  const SECTION_CARDS = [
-    { view: 'explorer', icon: 'fa-cube', title: '3D Explorer', tagline: `${PACKAGES.length} structures, taken apart layer by layer` },
-    { view: 'applications', icon: 'fa-satellite-dish', title: 'Applications', tagline: 'What each application asks of the package' },
-    { view: 'structure', icon: 'fa-diagram-project', title: 'Structure Map', tagline: 'The whole field as one map' },
-    { view: 'ideas', icon: 'fa-lightbulb', title: 'Ideas', tagline: 'My own concepts and sketches' }
-  ];
-
   function countChallenges() {
     const root = window.STRUCTURE_TREE;
     const ch = root && (root.children || []).find(n => n.id === 'challenges');
     return ch && ch.children ? ch.children.length : 0;
+  }
+
+  // Small "strata" swatch: the structure's own layer colours, bottom → top.
+  function strata(pkg) {
+    const seen = new Set();
+    const layers = pkg.elements
+      .slice()
+      .sort((a, b) => (a.geo.layer - b.geo.layer) || (a.geo.pos[1] - b.geo.pos[1]))
+      .filter(e => { if (seen.has(e.color)) return false; seen.add(e.color); return true; })
+      .slice(0, 9)
+      .reverse();
+    return `<div class="ov-strata" aria-hidden="true">${layers.map((e, i) =>
+      `<span style="background:${e.color};width:${58 + (i * 37) % 42}%"></span>`).join('')}</div>`;
   }
 
   function render() {
@@ -32,29 +38,52 @@
       { n: countChallenges(), label: 'challenges' }
     ].filter(s => s.n > 0);
 
+    const letter = i => String.fromCharCode(97 + i);
     const pkgShort = id => { const p = PACKAGES.find(x => x.id === id); return p ? p.short : id; };
-    const pkgLetter = id => { const i = PACKAGES.findIndex(x => x.id === id); return i >= 0 ? String.fromCharCode(97 + i) : ''; };
+    const pkgLetter = id => { const i = PACKAGES.findIndex(x => x.id === id); return i >= 0 ? letter(i) : ''; };
 
     root.innerHTML = `
-      <section class="ov-hero">
-        <div class="ov-eyebrow">Hoogwan's Lab Notebook · Advanced Packaging</div>
-        <h1 class="ov-title">The application sets the demand.<br>The <span class="ov-title-accent">system</span> answers it — from die to package.</h1>
-        <p class="ov-lede">A die is designed for what it computes. How it is connected, stacked, powered, cooled and linked to the outside world is decided at the package — and that choice follows the application. This atlas traces that chain.</p>
-        <div class="ov-stat-row">
-          ${stats.map(s => `<div class="ov-stat"><span class="ov-stat-n">${s.n}</span><span class="ov-stat-l">${s.label}</span></div>`).join('')}
+      <section class="ov-lead">
+        <div class="ov-lead-text">
+          <div class="ov-lead-kicker">Hoogwan's Lab Notebook · Advanced Packaging</div>
+          <h1 class="ov-lead-title">The application sets the demand. The system answers it — from die to package.</h1>
+          <p class="ov-lead-lede">A die is designed for what it computes. How it is connected, stacked, powered, cooled and linked to the world is decided at the package — and that choice follows the application.</p>
+          <div class="ov-lead-stats">
+            ${stats.map(s => `<span><b>${s.n}</b> ${s.label}</span>`).join('')}
+          </div>
+        </div>
+        <div class="ov-lead-art">
+          <img src="assets/hero.svg" alt="Illustrated package cross-section with a cleanroom engineer holding a wafer">
+        </div>
+      </section>
+
+      <section class="ov-section">
+        <h2 class="ov-section-head">Structures</h2>
+        <div class="ov-list">
+          ${PACKAGES.map((p, i) => `
+            <article class="ov-item">
+              <div class="ov-item-meta">
+                <div class="ov-item-type">Structure ${letter(i)}</div>
+                <div class="ov-item-sub">${p.elements.length} components</div>
+              </div>
+              <div class="ov-item-body">
+                <h3><a href="#" class="ov-item-link" data-pkg="${escapeHtml(p.id)}">${escapeHtml(p.name)}</a></h3>
+                <p>${escapeHtml(p.subtitle)}</p>
+              </div>
+              ${strata(p)}
+            </article>
+          `).join('')}
         </div>
       </section>
 
       ${APPS.length ? `
-      <section class="ov-chain">
-        <div class="ov-section-title"><b>Fig. 1</b> | Application → structure</div>
+      <section class="ov-section">
+        <h2 class="ov-section-head">From application to structure</h2>
         <div class="ov-chain-grid">
           ${APPS.map(a => `
             <div class="ov-chain-row">
-              <button class="ov-chain-app" data-view="applications" style="--app:${a.color}">
-                <i class="fa-solid ${a.icon}"></i><span>${escapeHtml(a.name)}</span>
-              </button>
-              <div class="ov-chain-arrow" aria-hidden="true"></div>
+              <a href="#" class="ov-chain-app" data-view="applications" style="--app:${a.color}">${escapeHtml(a.name)}</a>
+              <div class="ov-chain-tag">${escapeHtml(a.tagline || '')}</div>
               <div class="ov-chain-pkgs">
                 ${(a.recommendedPackages || []).map(id => `
                   <button class="ov-chain-pkg" data-pkg="${escapeHtml(id)}"><b>${pkgLetter(id)}</b> ${escapeHtml(pkgShort(id))}</button>
@@ -65,36 +94,24 @@
         </div>
       </section>` : ''}
 
-      <section class="ov-framework">
-        <div class="ov-section-title"><b>Fig. 2</b> | From application to research target</div>
-        <div class="ov-framework-strip">
-          ${FRAMEWORK.map((f, i) => `
-            <div class="ov-framework-step">
-              <div class="ov-framework-step-icon"><i class="fa-solid ${f.icon}"></i></div>
-              <div class="ov-framework-step-title">${escapeHtml(f.title)}</div>
-            </div>
-            ${i < FRAMEWORK.length - 1 ? '<div class="ov-framework-arrow"><i class="fa-solid fa-chevron-right"></i></div>' : ''}
-          `).join('')}
-        </div>
+      <section class="ov-section">
+        <h2 class="ov-section-head">How I read a structure</h2>
+        <ol class="ov-steps">
+          ${FRAMEWORK.map(f => `<li><span class="ov-step-n">${f.step}</span>${escapeHtml(f.title)}</li>`).join('')}
+        </ol>
       </section>
 
-      <section class="ov-cards">
-        ${SECTION_CARDS.map(c => `
-          <button class="ov-card" data-view="${c.view}">
-            <div class="ov-card-icon"><i class="fa-solid ${c.icon}"></i></div>
-            <h2 class="ov-card-title">${escapeHtml(c.title)}</h2>
-            <div class="ov-card-tagline">${escapeHtml(c.tagline)}</div>
-            <div class="ov-card-cta">Open <i class="fa-solid fa-arrow-right"></i></div>
-          </button>
-        `).join('')}
+      <section class="ov-section ov-more">
+        <a href="#" data-view="structure">The whole field as one map</a>
+        <a href="#" data-view="ideas">My ideas and sketches</a>
       </section>
     `;
 
     root.querySelectorAll('[data-view]').forEach(el => {
-      el.addEventListener('click', () => { if (window.AppNav) window.AppNav.switchView(el.dataset.view); });
+      el.addEventListener('click', e => { e.preventDefault(); if (window.AppNav) window.AppNav.switchView(el.dataset.view); });
     });
     root.querySelectorAll('[data-pkg]').forEach(el => {
-      el.addEventListener('click', () => { if (window.AppNav) window.AppNav.goToPackage(el.dataset.pkg); });
+      el.addEventListener('click', e => { e.preventDefault(); if (window.AppNav) window.AppNav.goToPackage(el.dataset.pkg); });
     });
   }
 
@@ -103,9 +120,6 @@
     return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', render);
-  } else {
-    render();
-  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', render);
+  else render();
 })();
