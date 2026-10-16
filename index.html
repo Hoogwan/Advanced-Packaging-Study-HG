@@ -118,6 +118,40 @@
   <div id="ideas-root" class="ideas-root"></div>
 </section>
 
+
+<!-- ============ Footer card: link to Hoogwan's research portfolio ============ -->
+<template id="tpl-portfolio-card">
+  <footer class="pf-footer">
+    <p class="pf-invite">If this interests you, visit Hoogwan’s <em>Research Portfolio</em>.</p>
+    <div class="pf-card">
+      <div class="pf-id">
+        <img class="pf-avatar" src="assets/engineer.svg" alt="" width="64" height="64">
+        <div>
+          <div class="pf-name">Hoogwan Lee</div>
+          <div class="pf-role">M.S. Researcher · Electronic Systems Laboratory</div>
+          <div class="pf-aff">Dept. of Semiconductor Engineering<br>Seoul National University of Science &amp; Technology</div>
+          <div class="pf-adv">Advisors: Prof. Sarah Eunkyung Kim &amp; Prof. Seulki Hong</div>
+        </div>
+      </div>
+      <div class="pf-actions">
+        <a class="pf-btn" href="https://hoogwan-portfolio.vercel.app/" target="_blank" rel="noopener">Visit Research Portfolio <span aria-hidden="true">→</span></a>
+        <a class="pf-mail" href="mailto:leehoogwan@naver.com">leehoogwan@naver.com</a>
+        <a class="pf-lab" href="https://esl.seoultech.ac.kr" target="_blank" rel="noopener">esl.seoultech.ac.kr</a>
+      </div>
+    </div>
+  </footer>
+</template>
+<script>
+  // Put the card at the bottom of every scrolling page (not the full-screen 3D explorer).
+  (function () {
+    var tpl = document.getElementById('tpl-portfolio-card');
+    ['view-overview', 'view-applications', 'view-structure', 'view-ideas'].forEach(function (id) {
+      var sec = document.getElementById(id);
+      if (sec && tpl) sec.appendChild(tpl.content.cloneNode(true));
+    });
+  })();
+</script>
+
 <!-- Three.js from CDN -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
