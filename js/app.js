@@ -497,6 +497,16 @@ function init() {
   activePkgIdx = loadLastPkg();
   if (!(activePkgIdx >= 0 && activePkgIdx < PACKAGES.length)) activePkgIdx = 0;
 
+  // Wordmark (logo + "Hoogwan's Lab Notebook") goes home to the Overview
+  const brand = document.querySelector('.brand');
+  if (brand) {
+    brand.setAttribute('role', 'link');
+    brand.setAttribute('tabindex', '0');
+    brand.setAttribute('aria-label', 'Home — Overview');
+    brand.addEventListener('click', () => switchView('overview'));
+    brand.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); switchView('overview'); } });
+  }
+
   // Top nav wiring
   document.querySelectorAll('.view-nav-btn').forEach(btn => {
     btn.addEventListener('click', () => switchView(btn.dataset.view));
