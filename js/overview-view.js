@@ -79,10 +79,10 @@
                 <div class="ov-item-sub">${p.elements.length} components</div>
               </div>
               <div class="ov-item-body">
-                <h3><a href="#" class="ov-link" data-pkg="${escapeHtml(p.id)}">${escapeHtml(p.name)}</a></h3>
+                <h3><a href="#/explorer/${escapeHtml(p.id)}" class="ov-link" data-pkg="${escapeHtml(p.id)}">${escapeHtml(p.name)}</a></h3>
                 <p>${escapeHtml(p.subtitle)}</p>
               </div>
-              <a href="#" class="ov-item-fig" data-pkg="${escapeHtml(p.id)}" aria-label="Open ${escapeHtml(p.name)} in 3D">${fig(p, 260, 120, 8)}</a>
+              <a href="#/explorer/${escapeHtml(p.id)}" class="ov-item-fig" data-pkg="${escapeHtml(p.id)}" aria-label="Open ${escapeHtml(p.name)} in 3D">${fig(p, 260, 120, 8)}</a>
             </article>
           `).join('')}
         </div>
@@ -96,7 +96,7 @@
             ${APPS.map(a => `
               <div class="ov-chain-row">
                 <div>
-                  <a href="#" class="ov-link ov-chain-app" data-view="applications">${escapeHtml(a.name)}</a>
+                  <a href="#/applications" class="ov-link ov-chain-app" data-view="applications">${escapeHtml(a.name)}</a>
                   <div class="ov-chain-tag">${escapeHtml(a.tagline || '')}</div>
                 </div>
                 <div class="ov-chain-pkgs">
@@ -118,8 +118,8 @@
       </div>
 
       <nav class="ov-more">
-        <a href="#" class="ov-link" data-view="structure">The whole field as one map</a>
-        <a href="#" class="ov-link" data-view="ideas">My ideas and sketches</a>
+        <a href="#/structure" class="ov-link" data-view="structure">The whole field as one map</a>
+        <a href="#/ideas" class="ov-link" data-view="ideas">My ideas and sketches</a>
       </nav>
     `;
 
@@ -144,6 +144,7 @@
       slide = (i + slides.length) % slides.length;
       slides.forEach((s, k) => { s.classList.toggle('is-active', k === slide); s.setAttribute('aria-hidden', k === slide ? 'false' : 'true'); });
       dots.forEach((d, k) => d.classList.toggle('is-active', k === slide));
+      stage.querySelector('.ov-stage-open').setAttribute('href', '#/explorer/' + PACKAGES[slide].id);
     };
     const start = () => { stop(); if (!reduce) timer = setInterval(() => { if (isVisible()) show(slide + 1); }, AUTO_MS); };
     const stop = () => { if (timer) clearInterval(timer); timer = null; };

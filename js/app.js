@@ -50,6 +50,7 @@ function switchTab(i) {
   document.getElementById('section-value').textContent = 'OFF';
   window.PkgScene.setExplode(0);
   window.PkgScene.setSection(0);
+  syncHash();
 }
 
 // ============ LAYER PANEL ============
@@ -81,6 +82,7 @@ function renderInfoEmpty() {
   const panel = document.getElementById('info-panel');
   const pkg = PACKAGES[activePkgIdx];
   panel.classList.add('empty');
+  if (activeView === 'explorer') syncHash();
   if (!pkg) { panel.innerHTML = ''; return; }
   const letter = String.fromCharCode(97 + activePkgIdx);
   panel.innerHTML = `
@@ -112,6 +114,7 @@ function selectElement(el) {
   currentEl = el;
   window.PkgScene.selectElement(el.id);
   renderInfoPanel(el);
+  syncHash();
 }
 
 async function renderInfoPanel(el) {
@@ -411,6 +414,7 @@ function switchView(viewName, opts) {
     requestAnimationFrame(() => { if (window.PkgScene) window.PkgScene.resize(); });
   }
   if (!opts.silent) window.scrollTo(0, 0);
+  syncHash();
 }
 
 function ensureExplorerReady() {
@@ -484,6 +488,64 @@ function goToPackage(packageId, elementId) {
   }
 }
 
+// ============ URL ROUTES (shareable links + back button) ============
+// #/overview · #/applications · #/structure · #/ideas
+// #/explorer/<structureId>[/<componentId>]   e.g. #/explorer/idea-pu/idea-hbm
+let routeSuppress = false;
+let routeTimer = null;
+let lastRoutePush = 0;
+
+function currentHash() {
+  if (activeView === 'explorer') {
+    const pkg = PACKAGES[activePkgIdx];
+    return '#/explorer/' + (pkg ? pkg.id : '') + (activeElementId ? '/' + activeElementId : '');
+  }
+  return '#/' + activeView;
+}
+
+function syncHash() {
+  if (routeSuppress) return;
+  clearTimeout(routeTimer);
+  routeTimer = setTimeout(() => {
+    try { if (/admin/.test(location.hash)) sessionStorage.setItem('showLogin', '1'); } catch (e) {}
+    const h = currentHash();
+    if (location.hash === h) return;
+    const now = Date.now();
+    // one click can change view, structure and component in quick succession — keep it one history step
+    if (now - lastRoutePush < 600) history.replaceState(null, '', h);
+    else history.pushState(null, '', h);
+    lastRoutePush = now;
+  }, 0);
+}
+
+function parseHash(hash) {
+  const parts = String(hash || '').replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
+  if (!parts.length || VIEWS.indexOf(parts[0]) === -1) return null;
+  return { view: parts[0], pkg: parts[1] || null, el: parts[2] || null };
+}
+
+function applyRoute(route) {
+  if (!route) return false;
+  routeSuppress = true;
+  if (route.view === 'explorer' && route.pkg) {
+    goToPackage(route.pkg, route.el || undefined);
+    // back from a component to its structure: clear the selection
+    if (!route.el && activeElementId && window.PkgScene) {
+      activeElementId = null; currentEl = null;
+      window.PkgScene.selectElement(null);
+      renderInfoEmpty();
+    }
+  } else switchView(route.view, { silent: true });
+  // goToPackage selects the component on the next frame — release after it
+  requestAnimationFrame(() => setTimeout(() => {
+    routeSuppress = false;
+    history.replaceState(null, '', currentHash());
+  }, 0));
+  return true;
+}
+
+window.addEventListener('popstate', () => applyRoute(parseHash(location.hash)));
+
 window.AppNav = {
   switchView,
   goToPackage,
@@ -518,7 +580,9 @@ function init() {
     const saved = localStorage.getItem(LASTVIEW_KEY);
     if (saved && VIEWS.indexOf(saved) !== -1) startView = saved;
   } catch (e) {}
-  switchView(startView, { silent: true });
+  const route = parseHash(location.hash);
+  if (route) startView = route.view;
+  if (!applyRoute(route)) switchView(startView, { silent: true });
 
   // Loading overlay only matters for the 3D explorer; hide it immediately
   // if we're not landing there so the Overview isn't blocked.

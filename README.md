@@ -97,6 +97,8 @@ webapp/
 - 커스텀 도메인 연결은 선택 사항 (Vercel에서 설정 가능)
 
 ## 운영 메모
+- 화면별 주소(공유 링크): `#/overview`, `#/applications`, `#/structure`, `#/ideas`, `#/explorer/<구조 id>[/<부품 id>]` (예: `#/explorer/idea-pu/idea-hbm`). 브라우저 뒤로/앞으로 버튼이 작동함
+- 공유 미리보기(Open Graph): `index.html`의 og/twitter 태그 + `assets/og-image.png` (1200×630)
 - 공개 화면에는 로그인 버튼이 없음. 오너 로그인은 주소 끝에 `#admin`을 붙여 접속 (예: `https://advanced-packaging-study-hg.vercel.app/#admin`)
 - 원본 콘텐츠의 Related Papers(검증 전)는 화면에서 숨김. 오너가 직접 추가한 논문(Supabase)만 표시
 - 3D 화면은 구조마다 자동으로 화면에 맞게 확대/축소(fitZoom)
